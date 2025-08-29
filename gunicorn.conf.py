@@ -9,7 +9,7 @@ backlog = 2048
 workers = 1  # Start with 1 worker for Render's free tier
 worker_class = "uvicorn.workers.UvicornWorker"
 worker_connections = 1000
-timeout = 30
+timeout = 120
 keepalive = 2
 
 # Restart workers after this many requests, to help prevent memory leaks
