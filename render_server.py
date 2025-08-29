@@ -3,8 +3,8 @@ Production FastAPI server for Render deployment
 """
 import os
 import logging
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+import sys
+from pathlib import Path
 
 # Set up logging for production
 logging.basicConfig(
@@ -12,22 +12,19 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
-# Import the main FastAPI app
-from fastapi_server import app
+# Add the pre_walkthrough_generator to the path
+sys.path.append(str(Path(__file__).parent / "pre_walkthrough_generator" / "src"))
 
-# Add production middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Configure this more restrictively in production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Import the main FastAPI app directly
+from fastapi_server import app
 
 # Health check for Render
 @app.get("/render-health")
 async def render_health():
     return {"status": "healthy", "service": "pre-walkthrough-generator"}
+
+# Export the app for ASGI servers
+application = app
 
 if __name__ == "__main__":
     import uvicorn
