@@ -16,6 +16,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 try:
+    # Test BeautifulSoup4 import first
+    try:
+        from bs4 import BeautifulSoup
+        logger.info("BeautifulSoup4 imported successfully")
+    except ImportError as bs4_error:
+        logger.error(f"BeautifulSoup4 import failed: {bs4_error}")
+        logger.error("This suggests beautifulsoup4 package is not installed properly")
+        raise
+    
     # Import the main FastAPI app
     from fastapi_server import app as fastapi_app
     logger.info("Successfully imported FastAPI app")
@@ -34,6 +43,7 @@ try:
     
 except ImportError as e:
     logger.error(f"Failed to import FastAPI app: {e}")
+    logger.error("Check that all dependencies are installed correctly")
     raise
 
 if __name__ == "__main__":
