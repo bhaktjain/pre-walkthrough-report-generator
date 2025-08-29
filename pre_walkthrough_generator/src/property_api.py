@@ -6,8 +6,16 @@ import http.client
 import json
 from openai import OpenAI
 import urllib.parse
-from bs4 import BeautifulSoup
 import logging
+
+# Try to import BeautifulSoup4, but make it optional for deployment
+try:
+    from bs4 import BeautifulSoup
+    HAS_BS4 = True
+except ImportError:
+    BeautifulSoup = None
+    HAS_BS4 = False
+    print("Warning: BeautifulSoup4 not available. Web scraping features will be disabled.")
 
 logger = logging.getLogger(__name__)
 
@@ -411,10 +419,14 @@ class PropertyAPI:
         if pid and pid.isdigit():
             logger.info(f"OpenAI returned property ID: {pid}")
             return pid
-        # 2. Web scrape fallback
-        pid = self._scrape_property_id_duckduckgo(address)
-        logger.info(f"Web scrape returned property ID: {pid}")
-        return pid
+        # 2. Web scrape fallback (only if BeautifulSoup4 is available)
+        if HAS_BS4:
+            pid = self._scrape_property_id_duckduckgo(address)
+            logger.info(f"Web scrape returned property ID: {pid}")
+            return pid
+        else:
+            logger.warning("BeautifulSoup4 not available, skipping web scraping fallback")
+            return None
 
     def get_all_property_data(self, address: str) -> Dict[str, Any]:
         """Get all property data in one call with optimized URL handling"""
@@ -583,6 +595,19 @@ class PropertyAPI:
     def get_realtor_link(self, address: str) -> Optional[str]:
         """Return canonical Realtor.com URL using cost-free layered strategy."""
         logger.info(f"Getting Realtor link for: {address}")
+        
+        if not HAS_BS4:
+            logger.warning("BeautifulSoup4 not available, skipping web scraping methods")
+            # Skip directly to property ID construction
+            pid = self.get_property_id(address)
+            logger.info(f"get_property_id returned: {pid}")
+            if pid:
+                constructed_url = self.build_realtor_url(pid, address)
+                logger.info(f"build_realtor_url constructed: {constructed_url}")
+                return constructed_url
+            logger.info("No Realtor.com URL found for address.")
+            return None
+        
         # 1. Try direct site search (free)
         url = self._realtor_site_search_url(address)
         logger.info(f"_realtor_site_search_url returned: {url}")
