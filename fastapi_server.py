@@ -25,6 +25,12 @@ try:
 except ImportError as e:
     logging.error(f"Import error: {e}")
     raise
+except Exception as e:
+    logging.error(f"Configuration error: {e}")
+    # Continue anyway - the config will be handled by environment variables
+    import transcript_processor
+    import property_api
+    import document_generator
 
 # Configure logging
 logging.basicConfig(
