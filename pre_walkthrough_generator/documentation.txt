@@ -1,0 +1,175 @@
+# Pre-Walkthrough Report Generator Documentation
+
+## Pipeline Overview
+
+1. **Transcript Processing**
+   - Extracts property address and renovation details from the transcript using OpenAI and regex/fuzzy matching.
+   - Normalizes and corrects address typos.
+
+2. **Property Lookup**
+   - Dynamically finds the Realtor.com listing URL using layered search (site search, DuckDuckGo, SerpAPI, or slug construction).
+   - Extracts the property ID from the listing URL or via OpenAI/web scraping.
+
+3. **Dynamic Data Fetching**
+   - **Property details** are fetched live from RapidAPI `/v2/property` using the property ID.
+   - **Photos and floor plans** are always fetched from the `/propertyPhotos` endpoint using the property ID. This ensures the most up-to-date and highest quality images, including floor plans.
+   - No static or hardcoded property details, images, or floor plans are ever used.
+
+4. **Report Generation**
+   - The canonical Realtor.com URL is always constructed using the property ID and address, ensuring the correct listing link in the report.
+   - All property details, photos, and floor plans are passed to the document generator.
+   - Floor plan images are embedded in the Word report using robust logic:
+     - Images are downloaded and, if needed, converted to PNG for compatibility.
+     - If embedding fails, a clickable link is provided as a fallback.
+   - All missing data is shown as "Information not available"—never static or unrelated data.
+
+## Troubleshooting
+
+- **Floor plan image not showing in report:**
+  - Ensure the `/propertyPhotos` endpoint returns a valid floor plan image URL for the property ID.
+  - The image must be accessible and in a supported format (JPG, PNG, etc.).
+  - The `Pillow` library (`pip install pillow`) is required for image conversion.
+  - Check the console for `[ERROR]` messages for download or embedding issues.
+  - If all else fails, the report will include a clickable link to the floor plan image.
+
+- **Realtor.com URL incorrect or missing:**
+  - The pipeline always attempts to construct the canonical URL using the property ID and address.
+  - If the property ID cannot be found, the URL may be missing; check address extraction and API quota.
+
+## No Static Data
+- The system is now fully dynamic. All property details, images, and floor plans are fetched live from APIs. No static or hardcoded data is used at any stage.  
+
+
+## Packaging & Editable Install
+
+- The `pre_walkthrough_generator` directory is a proper Python package, with a `pyproject.toml` at its root.
+- To make local code changes available to the Azure Function, install it in editable mode:
+  ```sh
+  python3.12 -m pip install -e ./pre_walkthrough_generator --break-system-packages
+  ```
+- Ensure there is an `__init__.py` in both `pre_walkthrough_generator/` and `pre_walkthrough_generator/src/`.
+
+## Azure Functions Deployment & Local Testing
+
+- The Azure Function app is in `azure_function/` and expects all dependencies in `azure_function/requirements.txt`.
+- To install all dependencies for the correct Python version (used by Azure Functions Core Tools):
+  ```sh
+  python3.12 -m pip install -r azure_function/requirements.txt --break-system-packages
+  ```
+- Start the function host:
+  ```sh
+  cd azure_function
+  func start --port 7071
+  ```
+- Test the endpoint:
+  ```sh
+  curl -X POST -H "Content-Type: text/plain" --data "Transcript text mentioning 123 Main St New York NY..." http://localhost:7071/api/reportgen --output PreWalkReport.docx
+  ```
+
+## Troubleshooting: Python Version & Module Issues
+
+- **ModuleNotFoundError: No module named 'openai'**
+  - This means the dependency is not installed for the Python version used by Azure Functions (often 3.12, not your shell default).
+  - Solution: Run
+    ```sh
+    python3.12 -m pip install -r azure_function/requirements.txt --break-system-packages
+    ```
+- **AttributeError: 'TranscriptProcessor' object has no attribute 'process_transcript_text'**
+  - This means the code is out of sync. Make sure you have the latest code and have reinstalled the package in editable mode.
+- **Port 7071 is unavailable**
+  - Run `lsof -i :7071` to find the process and `kill -9 <PID>` to free the port.
+- **Logs and Debugging**
+  - Run the function host with `--verbose` and check logs for stack traces.
+  - You can redirect logs to a file: `func start --port 7071 >../func.log 2>&1`
+
+## Common Errors & Solutions
+
+- **ModuleNotFoundError**: Always check you are installing dependencies for the correct Python version (see above).
+- **Function not loading or 500 errors**: Check logs for stack traces, ensure all code changes are installed, and all dependencies are present.
+- **Editable install not working**: Ensure `pyproject.toml` is present and correct, and that you use the `--break-system-packages` flag if needed.
+
+## Directory Structure
+
+- `pre_walkthrough_generator/` — main package (with `pyproject.toml`)
+- `pre_walkthrough_generator/src/` — all pipeline code
+- `azure_function/` — Azure Function app (with `requirements.txt`, `host.json`, etc.)
+
+---
+
+For further troubleshooting, see the Azure Functions Python docs: https://aka.ms/functions-modulenotfound  
+
+---
+
+Absolutely! Here’s a step-by-step guide to **verify and use your Azure Function locally**:
+
+---
+
+## 1. **Ensure All Dependencies Are Installed for Python 3.12**
+
+Azure Functions Core Tools uses Python 3.12 (not your system default).  
+**Run this from your project root:**
+```sh
+python3.12 -m pip install -r azure_function/requirements.txt --break-system-packages
+python3.12 -m pip install -e ./pre_walkthrough_generator --break-system-packages
+```
+This ensures all dependencies (including `openai`) are available to the function worker.
+
+---
+
+## 2. **Start the Azure Function Host**
+
+From your project root:
+```sh
+cd azure_function
+func start --port 7071
+```
+- You should see output like:
+  ```
+  Functions:
+      reportgen: [POST] http://localhost:7071/api/reportgen
+  ```
+
+---
+
+## 3. **Test the Endpoint**
+
+Open a new terminal window/tab (keep the function host running in the first one).
+
+Run:
+```sh
+curl -X POST -H "Content-Type: text/plain" \
+     --data "Transcript text mentioning 123 Main St New York NY..." \
+     http://localhost:7071/api/reportgen --output PreWalkReport.docx
+```
+- If successful, you’ll get a `PreWalkReport.docx` file in your current directory.
+
+---
+
+## 4. **Check the Output**
+
+- Open `PreWalkReport.docx` in Word or Google Docs.
+- Confirm that property details, images, and floor plans are present and dynamic (not static).
+
+---
+
+## 5. **If You Get Errors**
+
+- **ModuleNotFoundError**: Double-check you ran the pip install commands above with `python3.12`.
+- **AttributeError**: Make sure you reinstalled the package after any code changes.
+- **500 Error**: Check the function host logs for a stack trace and review the troubleshooting section in your documentation.
+
+---
+
+## 6. **Iterate**
+
+- Make any code changes you need in `pre_walkthrough_generator`.
+- Reinstall in editable mode if you change the package:
+  ```sh
+  python3.12 -m pip install -e ./pre_walkthrough_generator --break-system-packages
+  ```
+- Restart the function host if you change dependencies or package structure.
+
+---
+
+**Let me know if you hit any issues or want to automate any of these steps!**  
+Ready to proceed? If so, start the function host and try a test request as above. If you get an error, paste the output here and I’ll help you debug it!  
