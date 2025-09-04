@@ -161,17 +161,24 @@ class DocumentGenerator:
         duration = timeline.get('total_duration', 'TBD')
 
         # Build budget phrase smartly
-        if scope.get('kitchen', {}).get('estimated_cost', {}).get('range', {}).get('min'):
+        kitchen = scope.get('kitchen') or {}
+        kitchen_cost = kitchen.get('estimated_cost') or {}
+        kitchen_range = kitchen_cost.get('range') or {}
+        if kitchen_range.get('min'):
             kmin = scope['kitchen']['estimated_cost']['range']['min']
             kmax = scope['kitchen']['estimated_cost']['range']['max']
             min_total += kmin
             max_total += kmax if kmax else kmin # Use max if available, otherwise min
-        if scope.get('bathrooms', {}).get('count') and scope.get('bathrooms', {}).get('cost_per_bathroom'):
-            cost = scope['bathrooms']['cost_per_bathroom']
-            for i in range(1, scope['bathrooms']['count']+1):
+        bathrooms = scope.get('bathrooms') or {}
+        if bathrooms.get('count') and bathrooms.get('cost_per_bathroom'):
+            cost = bathrooms['cost_per_bathroom']
+            count = int(bathrooms['count'])  # Convert to int for range()
+            for i in range(1, count + 1):
                 min_total += cost
                 max_total += cost # Assuming max is the same as min for simplicity here
-        for item, cost in scope.get('additional_work', {}).get('estimated_costs', {}).items():
+        additional_work = scope.get('additional_work') or {}
+        estimated_costs = additional_work.get('estimated_costs') or {}
+        for item, cost in estimated_costs.items():
             if isinstance(cost, (int, float)):
                 min_total += cost
                 max_total += cost # Assuming max is the same as min for simplicity here
@@ -410,7 +417,8 @@ class DocumentGenerator:
         
         # Add Floor Plan section
         self.doc.add_heading('Floor Plan', level=2)
-        floor_plans = data.get('floor_plans', {}).get('floor_plans', []) or property_details.get('floor_plans', [])
+        floor_plans_data = data.get('floor_plans') or {}
+        floor_plans = floor_plans_data.get('floor_plans', []) or property_details.get('floor_plans', [])
         
         if floor_plans:
             for plan in floor_plans:
@@ -480,7 +488,8 @@ class DocumentGenerator:
         self.doc.add_heading('Renovation Scope', level=1)
         
         # Get renovation info from transcript data
-        renovation = data.get('transcript_info', {}).get('renovation_scope', {})
+        transcript_info = data.get('transcript_info') or {}
+        renovation = transcript_info.get('renovation_scope') or {}
         
         # Loop dynamically through each scope section; skip 'timeline' (rendered separately)
         for section_name, section in renovation.items():
@@ -503,7 +512,9 @@ class DocumentGenerator:
         """Add timeline and phasing section dynamically (no default placeholder values)."""
         self.doc.add_heading('Timeline & Phasing', level=1)
 
-        timeline = data.get('transcript_info', {}).get('renovation_scope', {}).get('timeline', {}) or {}
+        transcript_info = data.get('transcript_info') or {}
+        renovation_scope = transcript_info.get('renovation_scope') or {}
+        timeline = renovation_scope.get('timeline') or {}
 
         # Map readable labels to transcript keys
         key_map = {
@@ -534,14 +545,17 @@ class DocumentGenerator:
         table = self.doc.add_table(rows=0, cols=2)
         table.style = 'Table Grid'
         
-        renovation = data.get('transcript_info', {}).get('renovation_scope', {})
+        transcript_info = data.get('transcript_info') or {}
+        renovation = transcript_info.get('renovation_scope') or {}
         kitchen = renovation.get('kitchen', {})
         bathrooms = renovation.get('bathrooms', {})
         additional = renovation.get('additional_work', {})
         
         details = []
         # Kitchen cost
-        if kitchen.get('estimated_cost', {}).get('range', {}).get('min'):
+        kitchen_cost = kitchen.get('estimated_cost') or {}
+        kitchen_range = kitchen_cost.get('range') or {}
+        if kitchen_range.get('min'):
             kmin = kitchen['estimated_cost']['range']['min']
             kmax = kitchen['estimated_cost']['range']['max']
             details.append(('Kitchen Total', f"{self._format_currency(kmin)} - {self._format_currency(kmax) if kmax else 'TBD'}"))
@@ -549,7 +563,8 @@ class DocumentGenerator:
         # Bathrooms cost
         if bathrooms.get('count') and bathrooms.get('cost_per_bathroom'):
             cost = self._format_currency(bathrooms['cost_per_bathroom'])
-            for i in range(1, bathrooms['count']+1):
+            count = int(bathrooms['count'])  # Convert to int for range()
+            for i in range(1, count + 1):
                 details.append((f"Bathroom {i}", f"~{cost}"))
 
         # Additional work estimated_costs dict supports arbitrary entries
@@ -559,14 +574,17 @@ class DocumentGenerator:
         
         # Total
         min_total, max_total = 0, 0 # Initialize to 0
-        if kitchen.get('estimated_cost', {}).get('range', {}).get('min'):
+        kitchen_cost = kitchen.get('estimated_cost') or {}
+        kitchen_range = kitchen_cost.get('range') or {}
+        if kitchen_range.get('min'):
             kmin = kitchen['estimated_cost']['range']['min']
             kmax = kitchen['estimated_cost']['range']['max']
             min_total += kmin
             max_total += kmax if kmax else kmin
         if bathrooms.get('count') and bathrooms.get('cost_per_bathroom'):
             cost = bathrooms['cost_per_bathroom']
-            for i in range(1, bathrooms['count']+1):
+            count = int(bathrooms['count'])  # Convert to int for range()
+            for i in range(1, count + 1):
                 min_total += cost
                 max_total += cost
         for item, cost in additional.get('estimated_costs', {}).items():
@@ -601,10 +619,12 @@ class DocumentGenerator:
             notes.append(f"• {materials['sourcing_responsibility']}")
         
         # Specific requirements
-        if renovation.get('kitchen', {}).get('specific_requirements'):
-            notes.extend(f"• {req}" for req in renovation['kitchen']['specific_requirements'])
-        if renovation.get('bathrooms', {}).get('specific_requirements'):
-            notes.extend(f"• {req}" for req in renovation['bathrooms']['specific_requirements'])
+        kitchen_reno = renovation.get('kitchen') or {}
+        if kitchen_reno.get('specific_requirements'):
+            notes.extend(f"• {req}" for req in kitchen_reno['specific_requirements'])
+        bathrooms_reno = renovation.get('bathrooms') or {}
+        if bathrooms_reno.get('specific_requirements'):
+            notes.extend(f"• {req}" for req in bathrooms_reno['specific_requirements'])
         
         # Project management notes
         if project_mgmt.get('communication_preferences'):
@@ -672,6 +692,8 @@ class DocumentGenerator:
             
         except Exception as e:
             print(f"\nError generating report: {e}")
+            import traceback
+            traceback.print_exc()
             return None 
 
     # ------------------------------------------------------------------

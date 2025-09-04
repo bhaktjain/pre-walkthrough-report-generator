@@ -125,9 +125,11 @@ class PropertyAPI:
             d = data['data']
 
             def search_details(category=None, regex=None, contains=None):
-                for det in d.get('details', []):
+                details_list = d.get('details') or []
+                for det in details_list:
                     if category and det.get('category', '').lower() == category.lower():
-                        for t in det.get('text', []):
+                        text_list = det.get('text') or []
+                        for t in text_list:
                             if regex:
                                 m = re.search(regex, t)
                                 if m:
@@ -136,7 +138,8 @@ class PropertyAPI:
                                 return t
                             else:
                                 return t
-                    for t in det.get('text', []):
+                    text_list = det.get('text') or []
+                    for t in text_list:
                         if contains and contains.lower() in t.lower():
                             return t
                         if regex:
@@ -146,8 +149,10 @@ class PropertyAPI:
                 return None
 
             def search_details_any(regex):
-                for det in d.get('details', []):
-                    for t in det.get('text', []):
+                details_list = d.get('details') or []
+                for det in details_list:
+                    text_list = det.get('text') or []
+                    for t in text_list:
                         m = re.search(regex, t)
                         if m:
                             return m.group(1)
@@ -265,8 +270,10 @@ class PropertyAPI:
             if not property_type:
                 property_type = search_details_any(r'Property Subtype: ([\w-]+)')
             if not property_type:
-                for det in d.get('details', []):
-                    for t in det.get('text', []):
+                details_list = d.get('details') or []
+                for det in details_list:
+                    text_list = det.get('text') or []
+                    for t in text_list:
                         if 'property subtype' in t.lower():
                             property_type = t.split(':')[-1].strip()
                             break
@@ -282,8 +289,10 @@ class PropertyAPI:
             if not neighborhood:
                 neighborhood = search_details_any(r'Neighborhood: ([\w\s-]+)')
             if not neighborhood:
-                for det in d.get('details', []):
-                    for t in det.get('text', []):
+                details_list = d.get('details') or []
+                for det in details_list:
+                    text_list = det.get('text') or []
+                    for t in text_list:
                         if 'neighborhood' in t.lower():
                             neighborhood = t.split(':')[-1].strip()
                             break
