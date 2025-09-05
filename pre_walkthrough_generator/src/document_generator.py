@@ -390,7 +390,7 @@ class DocumentGenerator:
         """Add property links section"""
         self.doc.add_heading('Property Links', level=1)
         
-        property_details = data.get('property_details', {})
+        property_details = data.get('property_details') or {}
 
         realtor_url = data.get('realtor_url')
         if not realtor_url:
