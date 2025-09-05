@@ -546,35 +546,60 @@ class PropertyAPI:
         try:
             query = urllib.parse.quote_plus(f"{address} site:realtor.com")
             url = f"https://duckduckgo.com/html/?q={query}"
+            logger.info(f"DuckDuckGo search URL: {url}")
+            
             headers = {
                 "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             }
             resp = requests.get(url, headers=headers, timeout=10)
+            logger.info(f"DuckDuckGo response status: {resp.status_code}")
+            
             if resp.status_code != 200:
+                logger.warning(f"DuckDuckGo returned status {resp.status_code}")
                 return None
+                
             soup = BeautifulSoup(resp.text, "html.parser")
-            for a in soup.select('a.result__a'):
+            results = soup.select('a.result__a')
+            logger.info(f"Found {len(results)} search results")
+            
+            realtor_urls_found = []
+            for a in results:
                 href = a.get('href', '')
                 # DuckDuckGo wraps links: /l/?uddg=<URL-ENCODED>
                 if 'uddg=' in href:
                     real_url = urllib.parse.parse_qs(urllib.parse.urlparse(href).query).get('uddg', [None])[0]
                 else:
                     real_url = href
-                if real_url and 'realtor.com/realestateandhomes-detail' in real_url:
-                    # Check if the URL contains the specific apartment number from the search
-                    original_apt = self._extract_apartment_from_address(address)
-                    if original_apt:
-                        url_apt = self._extract_apartment_from_url(real_url)
-                        if url_apt and url_apt.lower() != original_apt.lower():
-                            print(f"[DEBUG] Apartment mismatch: searched for {original_apt}, found {url_apt}")
-                            continue  # Skip this result, look for exact apartment match
                     
-                    match = re.search(r'_M([\d-]+)', real_url)
-                    if match:
-                        numeric = match.group(1).replace('-', '')
-                        return numeric if numeric.isdigit() else None
+                if real_url and 'realtor.com' in real_url:
+                    realtor_urls_found.append(real_url)
+                    logger.info(f"Found Realtor.com URL: {real_url}")
+                    
+                    if 'realestateandhomes-detail' in real_url:
+                        # Check if the URL contains the specific apartment number from the search
+                        original_apt = self._extract_apartment_from_address(address)
+                        if original_apt:
+                            url_apt = self._extract_apartment_from_url(real_url)
+                            if url_apt and url_apt.lower() != original_apt.lower():
+                                logger.info(f"Apartment mismatch: searched for {original_apt}, found {url_apt}")
+                                continue  # Skip this result, look for exact apartment match
+                        
+                        match = re.search(r'_M([\d-]+)', real_url)
+                        if match:
+                            numeric = match.group(1).replace('-', '')
+                            if numeric.isdigit():
+                                logger.info(f"Extracted property ID: {numeric}")
+                                return numeric
+                            
+            logger.info(f"Total Realtor.com URLs found: {len(realtor_urls_found)}")
+            if not realtor_urls_found:
+                logger.warning("No Realtor.com URLs found in search results")
+            else:
+                logger.warning("Found Realtor.com URLs but none were property detail pages with IDs")
+                
             return None
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error in DuckDuckGo scraping: {e}")
             return None
 
     def get_realtor_link(self, address: str) -> Optional[str]:
