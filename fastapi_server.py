@@ -146,23 +146,23 @@ def process_transcript_and_generate_report(transcript_path: str, address: str = 
                 if address and address.upper() != 'NONE':
                     logger.info(f"Extracted address from transcript: {address}")
                 else:
-                logger.info("Could not extract address from transcript, trying filename...")
-                # Try to match any plausible address substring
-                fname = Path(transcript_path).stem.replace('_', ' ').replace('-', ' ')
-                m = re.search(r"(\d+\s*[NSEWnsew]?\s*\d*\s*\w+\s*(?:st|street|ave|avenue|rd|road|blvd|drive|dr|pl|place)?[^,\n]*)(?:,?\s*(apt|apartment|unit)?\s*([\w\d]+))?", fname, re.IGNORECASE)
-                if m:
-                    street = m.group(1).strip()
-                    apt = m.group(3)
-                    city = "Brooklyn"
-                    state = "NY"
-                    addr = f"{street}"
-                    if apt:
-                        addr += f", Apt {apt}"
-                    addr += f", {city}, {state}"
-                    address = addr
-                    logger.info(f"Constructed address from filename: {address}")
-                else:
-                    address = fname + ", Brooklyn, NY"
+                    logger.info("Could not extract address from transcript, trying filename...")
+                    # Try to match any plausible address substring
+                    fname = Path(transcript_path).stem.replace('_', ' ').replace('-', ' ')
+                    m = re.search(r"(\d+\s*[NSEWnsew]?\s*\d*\s*\w+\s*(?:st|street|ave|avenue|rd|road|blvd|drive|dr|pl|place)?[^,\n]*)(?:,?\s*(apt|apartment|unit)?\s*([\w\d]+))?", fname, re.IGNORECASE)
+                    if m:
+                        street = m.group(1).strip()
+                        apt = m.group(3)
+                        city = "Brooklyn"
+                        state = "NY"
+                        addr = f"{street}"
+                        if apt:
+                            addr += f", Apt {apt}"
+                        addr += f", {city}, {state}"
+                        address = addr
+                        logger.info(f"Constructed address from filename: {address}")
+                    else:
+                        address = fname + ", Brooklyn, NY"
                     logger.info(f"Using fallback address: {address}")
         
         if address:
