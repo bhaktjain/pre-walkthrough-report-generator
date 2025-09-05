@@ -160,35 +160,49 @@ class DocumentGenerator:
         timeline = scope.get('timeline', {})
         duration = timeline.get('total_duration', 'TBD')
 
-        # Build budget phrase smartly
-        kitchen = scope.get('kitchen') or {}
-        kitchen_cost = kitchen.get('estimated_cost') or {}
-        kitchen_range = kitchen_cost.get('range') or {}
-        if kitchen_range.get('min'):
-            kmin = scope['kitchen']['estimated_cost']['range']['min']
-            kmax = scope['kitchen']['estimated_cost']['range']['max']
-            min_total += kmin
-            max_total += kmax if kmax else kmin # Use max if available, otherwise min
-        bathrooms = scope.get('bathrooms') or {}
-        if bathrooms.get('count') and bathrooms.get('cost_per_bathroom'):
-            cost = bathrooms['cost_per_bathroom']
-            count = int(bathrooms['count'])  # Convert to int for range()
-            for i in range(1, count + 1):
-                min_total += cost
-                max_total += cost # Assuming max is the same as min for simplicity here
+        # Build budget phrase smartly - check for per sq ft cost first
         additional_work = scope.get('additional_work') or {}
         estimated_costs = additional_work.get('estimated_costs') or {}
-        for item, cost in estimated_costs.items():
-            if isinstance(cost, (int, float)):
-                min_total += cost
-                max_total += cost # Assuming max is the same as min for simplicity here
-
-        if min_total and max_total and max_total != min_total:
-            budget_phrase = f"Budget ${min_total:,} – ${max_total:,}"
-        elif min_total and (not max_total or max_total == min_total):
-            budget_phrase = f"Budget from ${min_total:,} (upper bound TBD)"
+        per_sqft_cost = estimated_costs.get('per_sqft_cost')
+        total_range = estimated_costs.get('total_estimated_range') or {}
+        
+        # If we have per sq ft cost, use that as the primary budget info
+        if per_sqft_cost:
+            if total_range.get('min') and total_range.get('max'):
+                budget_phrase = f"Budget ${per_sqft_cost}/sq ft (estimated ${total_range['min']:,} – ${total_range['max']:,})"
+            elif total_range.get('min'):
+                budget_phrase = f"Budget ${per_sqft_cost}/sq ft (estimated from ${total_range['min']:,})"
+            else:
+                budget_phrase = f"Budget from ${per_sqft_cost}/sq ft"
         else:
-            budget_phrase = None  # unknown
+            # Fallback to old logic for projects without per sq ft pricing
+            kitchen = scope.get('kitchen') or {}
+            kitchen_cost = kitchen.get('estimated_cost') or {}
+            kitchen_range = kitchen_cost.get('range') or {}
+            if kitchen_range.get('min'):
+                kmin = scope['kitchen']['estimated_cost']['range']['min']
+                kmax = scope['kitchen']['estimated_cost']['range']['max']
+                min_total += kmin
+                max_total += kmax if kmax else kmin # Use max if available, otherwise min
+            bathrooms = scope.get('bathrooms') or {}
+            if bathrooms.get('count') and bathrooms.get('cost_per_bathroom'):
+                cost = bathrooms['cost_per_bathroom']
+                count = int(bathrooms['count'])  # Convert to int for range()
+                for i in range(1, count + 1):
+                    min_total += cost
+                    max_total += cost # Assuming max is the same as min for simplicity here
+            
+            for item, cost in estimated_costs.items():
+                if isinstance(cost, (int, float)) and item != 'per_sqft_cost':
+                    min_total += cost
+                    max_total += cost # Assuming max is the same as min for simplicity here
+
+            if min_total and max_total and max_total != min_total:
+                budget_phrase = f"Budget ${min_total:,} – ${max_total:,}"
+            elif min_total and (not max_total or max_total == min_total):
+                budget_phrase = f"Budget from ${min_total:,} (upper bound TBD)"
+            else:
+                budget_phrase = None  # unknown
 
         key_parts = []
         if budget_phrase:
@@ -217,8 +231,11 @@ class DocumentGenerator:
         # Add property details
         property_info = data.get('property_details', {}) or {}
         
-        # Format price if available
+        # Format price if available, fallback to last sold price
         price = property_info.get('price', 'Information not available')
+        last_sold_price = property_info.get('last_sold_price')
+        last_sold_date = property_info.get('last_sold_date')
+        
         if isinstance(price, (int, float)):
             price_display = f"${price:,.2f}"
         elif price not in (None, '', 'Information not available'):
@@ -228,6 +245,16 @@ class DocumentGenerator:
                 price_display = f"${price_num:,.2f}"
             except Exception:
                 price_display = str(price)
+        elif last_sold_price and last_sold_date:
+            # Use last sold price if current price not available
+            if isinstance(last_sold_price, (int, float)):
+                price_display = f"Last sold: ${last_sold_price:,.2f} ({last_sold_date})"
+            else:
+                try:
+                    price_num = float(str(last_sold_price).replace(',', '').replace('$', ''))
+                    price_display = f"Last sold: ${price_num:,.2f} ({last_sold_date})"
+                except Exception:
+                    price_display = f"Last sold: {last_sold_price} ({last_sold_date})"
         else:
             price_display = 'Contact broker for pricing'
 
