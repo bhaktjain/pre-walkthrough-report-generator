@@ -46,9 +46,9 @@ class TranscriptProcessor:
         
         try:
             # Directly extract renovation and client information (no property ID)
-            info_prompt = """Extract comprehensive structured information from this renovation consultation transcript. Pay special attention to budget numbers, timelines, specific project requirements, and client constraints.
+            info_prompt = """Extract comprehensive structured information from this renovation/construction consultation transcript. This could be any type of project: kitchen renovation, bathroom remodel, home addition, whole-house renovation, commercial project, etc. Pay special attention to budget numbers, timelines, specific project requirements, and client constraints.
 
-Return ONLY valid JSON matching this exact structure:
+Return ONLY valid JSON matching this exact structure (fill in only the sections that are relevant to this specific consultation):
 {
     "property_address": string,  // The complete property address being renovated (extract exactly as mentioned)
     "property_info": {
@@ -69,7 +69,7 @@ Return ONLY valid JSON matching this exact structure:
             "design_involvement": string,  // How involved they want to be in design
             "quality_preference": string  // Their quality expectations
         },
-        "constraints": string[],  // Any limitations or constraints mentioned (expecting child, timeline, etc.)
+        "constraints": string[],  // Any limitations or constraints mentioned (family situations, work schedules, health, budget, etc.)
         "red_flags": {
             "is_negative_reviewer": boolean,  // Do they seem like they might leave bad reviews?
             "payment_concerns": boolean,  // Any concerns about their ability to pay?
@@ -127,11 +127,12 @@ Return ONLY valid JSON matching this exact structure:
             "total_duration": string,  // Expected project duration
             "phasing": string,  // How project will be phased
             "living_arrangements": string,  // Where client will live during renovation
-            "constraints": string[],  // Timeline constraints (baby due, etc.)
+            "constraints": string[],  // Timeline constraints (family events, work schedules, seasonal factors, etc.)
             "key_dates": {
-                "survey_completion": string,  // When survey results expected
-                "walkthrough_scheduled": string,  // When walkthrough is planned
-                "project_start": string  // When project might start
+                "survey_completion": string,  // When survey/assessment results expected
+                "walkthrough_scheduled": string,  // When site visit/walkthrough is planned
+                "project_start": string,  // When project might start
+                "other_milestones": string[]  // Any other important dates mentioned
             }
         }
     },
@@ -162,14 +163,18 @@ Return ONLY valid JSON matching this exact structure:
 }
 
 CRITICAL EXTRACTION RULES:
-1. BUDGET NUMBERS: Extract ALL dollar amounts mentioned - cost per sq ft, total estimates, architect fees, deposits, etc.
-2. TIMELINE DETAILS: Extract specific dates, durations, and scheduling constraints
-3. PROJECT SCOPE: Be very specific about what rooms/work is requested
-4. CLIENT CONSTRAINTS: Note pregnancy, living arrangements, timeline pressures
-5. COMPANY INFO: Extract contractor company details, process, fees
-6. EXACT QUOTES: For requirements, use exact client language when possible
-7. NUMBERS: Convert written numbers to digits (e.g., "two hundred fifty thousand" = 250000)
-8. ADDRESSES: Extract complete address exactly as stated, fix obvious typos
+1. BUDGET NUMBERS: Extract ALL dollar amounts mentioned - cost per sq ft, total estimates, architect fees, deposits, material costs, etc.
+2. TIMELINE DETAILS: Extract specific dates, durations, scheduling constraints, and any time-sensitive factors
+3. PROJECT SCOPE: Be very specific about what work is requested - rooms, systems, structural changes, etc.
+4. CLIENT CONSTRAINTS: Note any personal constraints (family situations, work schedules, living arrangements, health issues, etc.)
+5. COMPANY INFO: Extract contractor/company details, process descriptions, fee structures, services offered
+6. EXACT QUOTES: For requirements and preferences, use exact client language when possible
+7. NUMBERS: Convert written numbers to digits (e.g., "two hundred fifty thousand" = 250000, "five percent" = 5)
+8. ADDRESSES: Extract complete address exactly as stated, correct obvious spelling errors
+9. FLEXIBILITY: If certain sections don't apply to this consultation (e.g., no kitchen work discussed), leave those fields empty or null
+10. COMPLETENESS: Capture all mentioned work types - renovations, additions, repairs, maintenance, new construction, etc.
+11. ADAPTABILITY: This template works for any project size - from single room renovations to whole-house projects to commercial work
+12. CONTEXT AWARENESS: Consider the type of property (house, condo, commercial) and adjust extraction accordingly
 
 Process this transcript and return ONLY the JSON:"""
 
@@ -177,7 +182,7 @@ Process this transcript and return ONLY the JSON:"""
             info_response = self.client.chat.completions.create(
                 model="gpt-4o",  # Use the latest and most capable model
                 messages=[
-                    {"role": "system", "content": "You are an expert renovation consultant assistant that extracts comprehensive, detailed information from consultation transcripts. You pay close attention to budget numbers, timelines, specific requirements, and client constraints."},
+                    {"role": "system", "content": "You are an expert renovation consultant assistant that extracts comprehensive, detailed information from any type of renovation or construction consultation transcript. You work with all project types: kitchen renovations, bathroom remodels, additions, whole-house renovations, commercial projects, etc. You pay close attention to budget numbers, timelines, specific requirements, and client constraints regardless of project scope."},
                     {"role": "user", "content": info_prompt},
                     {"role": "user", "content": cleaned_transcript}
                 ],
