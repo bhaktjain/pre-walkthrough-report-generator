@@ -77,35 +77,11 @@ class PropertyAPI:
         return address
 
     def get_property_id_from_openai(self, address: str) -> Optional[str]:
-        """Use OpenAI to get the property ID or MLS ID"""
-        try:
-            if not self.openai_api_key:
-                return None
-
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4-turbo-preview",
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant that finds property listings and their IDs. You have access to web search and MLS databases. When searching, look for any type of listing ID (MLS #, Listing #, etc) and return it exactly as found."},
-                    {"role": "user", "content": address}
-                ],
-                temperature=0,
-                max_tokens=100
-            )
-            
-            raw = response.choices[0].message.content.strip()
-            if raw.lower() == 'none':
-                return None
-                
-            # Capture IDs that may contain a hyphen (e.g., M48195-62808)
-            match = re.search(r'[mM]([\d-]{9,15})', raw)
-            if not match:
-                return None
-            numeric = match.group(1).replace('-', '')  # strip hyphen
-            return numeric if numeric.isdigit() else None
-            
-        except Exception as e:
-            print(f"Error getting listing ID from OpenAI: {e}")
-            return None
+        """Use OpenAI to get the property ID or MLS ID - Currently disabled as OpenAI doesn't have real-time MLS access"""
+        # OpenAI doesn't actually have access to real-time MLS databases or web search
+        # This method is disabled to avoid false expectations
+        logger.info("OpenAI property ID lookup is disabled - OpenAI doesn't have real-time MLS access")
+        return None
 
     def get_property_details(self, property_id: str) -> Dict[str, Any]:
         """Get detailed property information using property ID (live RapidAPI)."""
@@ -421,20 +397,20 @@ class PropertyAPI:
         return None
 
     def get_property_id(self, address: str) -> Optional[str]:
-        """High-level helper to get property ID via OpenAI -> Web scrape."""
+        """High-level helper to get property ID via web scraping."""
         logger.info(f"Getting property ID for: {address}")
-        # 1. OpenAI
-        pid = self.get_property_id_from_openai(address)
-        if pid and pid.isdigit():
-            logger.info(f"OpenAI returned property ID: {pid}")
-            return pid
-        # 2. Web scrape fallback (only if BeautifulSoup4 is available)
+        
+        # Check if BeautifulSoup4 is available
+        logger.info(f"BeautifulSoup4 available: {HAS_BS4}")
+        
+        # Skip OpenAI method and go directly to web scraping
         if HAS_BS4:
+            logger.info("Attempting web scraping via DuckDuckGo...")
             pid = self._scrape_property_id_duckduckgo(address)
             logger.info(f"Web scrape returned property ID: {pid}")
             return pid
         else:
-            logger.warning("BeautifulSoup4 not available, skipping web scraping fallback")
+            logger.warning("BeautifulSoup4 not available, cannot perform web scraping")
             return None
 
     def get_all_property_data(self, address: str) -> Dict[str, Any]:
