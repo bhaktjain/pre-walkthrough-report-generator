@@ -46,11 +46,11 @@ class TranscriptProcessor:
         
         try:
             # Directly extract renovation and client information (no property ID)
-            info_prompt = """Extract structured information from this renovation consultation transcript.
+            info_prompt = """Extract comprehensive structured information from this renovation consultation transcript. Pay special attention to budget numbers, timelines, specific project requirements, and client constraints.
 
 Return ONLY valid JSON matching this exact structure:
 {
-    "property_address": string or null,  // The complete property address being renovated
+    "property_address": string,  // The complete property address being renovated (extract exactly as mentioned)
     "property_info": {
         "building_type": string,  // e.g., "house", "condo", "co-op", "townhouse"
         "total_units": number or null,
@@ -69,7 +69,7 @@ Return ONLY valid JSON matching this exact structure:
             "design_involvement": string,  // How involved they want to be in design
             "quality_preference": string  // Their quality expectations
         },
-        "constraints": string[],  // Any limitations or constraints mentioned
+        "constraints": string[],  // Any limitations or constraints mentioned (expecting child, timeline, etc.)
         "red_flags": {
             "is_negative_reviewer": boolean,  // Do they seem like they might leave bad reviews?
             "payment_concerns": boolean,  // Any concerns about their ability to pay?
@@ -100,64 +100,89 @@ Return ONLY valid JSON matching this exact structure:
             "count": number or null,  // How many bathrooms to renovate (extract as number, e.g., 2.5)
             "cost_per_bathroom": number or null,  // Budget per bathroom if mentioned
             "plumbing_changes": string,  // Plumbing work needed
-            "specific_requirements": string[],  // Specific bathroom requirements
+            "specific_requirements": string[],  // Specific bathroom requirements (ensuite, etc.)
             "fixtures": string[],  // Fixtures mentioned (toilet, sink, etc.)
             "finishes": string[],  // Finishes mentioned (tile, etc.)
             "constraints": string[]  // Any bathroom constraints
         },
         "additional_work": {
-            "rooms": string[],
-            "structural_changes": string[],
-            "systems_updates": string[],
-            "custom_features": string[],
-            "estimated_costs": object
+            "rooms": string[],  // Specific rooms to add/modify (extract exact descriptions)
+            "structural_changes": string[],  // Foundation, structural work mentioned
+            "systems_updates": string[],  // HVAC, electrical, plumbing systems
+            "custom_features": string[],  // Any custom features requested
+            "estimated_costs": {
+                "per_sqft_cost": number or null,  // Cost per square foot mentioned
+                "total_estimated_range": {
+                    "min": number or null,  // Minimum total project cost
+                    "max": number or null   // Maximum total project cost
+                },
+                "architect_fees": {
+                    "percentage": number or null,  // Architect fee percentage
+                    "estimated_amount": number or null  // Estimated architect fee amount
+                },
+                "additional_fees": string[]  // Any other fees mentioned
+            }
         },
         "timeline": {
-            "total_duration": string,
-            "phasing": string,
-            "living_arrangements": string,
-            "constraints": string[]
+            "total_duration": string,  // Expected project duration
+            "phasing": string,  // How project will be phased
+            "living_arrangements": string,  // Where client will live during renovation
+            "constraints": string[],  // Timeline constraints (baby due, etc.)
+            "key_dates": {
+                "survey_completion": string,  // When survey results expected
+                "walkthrough_scheduled": string,  // When walkthrough is planned
+                "project_start": string  // When project might start
+            }
         }
     },
     "materials_and_design": {
-        "sourcing_responsibility": string,
-        "specific_materials": string[],
-        "style_preferences": string[],
-        "quality_preferences": string[],
-        "trade_discounts": string[],
-        "reuse_materials": string[]
+        "sourcing_responsibility": string,  // Who handles material sourcing
+        "specific_materials": string[],  // Specific materials mentioned
+        "style_preferences": string[],  // Design style preferences
+        "quality_preferences": string[],  // Quality level preferences
+        "trade_discounts": string[],  // Any trade discounts mentioned
+        "reuse_materials": string[]  // Materials to reuse
     },
     "project_management": {
-        "client_involvement": string,
-        "design_services": string[],
-        "documentation_needs": string[],
-        "permit_requirements": string[],
-        "contractor_requirements": string[],
-        "communication_preferences": string,
-        "decision_process": string
+        "client_involvement": string,  // How involved client wants to be
+        "design_services": string[],  // Design services needed
+        "documentation_needs": string[],  // Permits, drawings needed
+        "permit_requirements": string[],  // Permit requirements mentioned
+        "contractor_requirements": string[],  // What they want from contractor
+        "communication_preferences": string,  // How they prefer to communicate
+        "decision_process": string,  // How they make decisions
+        "company_details": {
+            "company_name": string,  // Contractor company name
+            "contact_person": string,  // Main contact person
+            "services_offered": string[],  // Services the company offers
+            "fees_structure": string[],  // Fee structure mentioned
+            "process_description": string  // How their process works
+        }
     }
 }
 
-IMPORTANT INSTRUCTIONS:
-- Extract the EXACT property address as mentioned in the transcript
-- For budget numbers, extract actual dollar amounts mentioned (e.g., if they say "forty thousand" extract 40000)
-- For bathroom count, include decimals if mentioned (e.g., "2.5 bathrooms" = 2.5)
-- Be specific and detailed in requirements arrays - include exact quotes when possible
-- If information is not mentioned, use empty string "" or null, not "not provided"
-- Focus on actionable, specific information that would help a contractor prepare
+CRITICAL EXTRACTION RULES:
+1. BUDGET NUMBERS: Extract ALL dollar amounts mentioned - cost per sq ft, total estimates, architect fees, deposits, etc.
+2. TIMELINE DETAILS: Extract specific dates, durations, and scheduling constraints
+3. PROJECT SCOPE: Be very specific about what rooms/work is requested
+4. CLIENT CONSTRAINTS: Note pregnancy, living arrangements, timeline pressures
+5. COMPANY INFO: Extract contractor company details, process, fees
+6. EXACT QUOTES: For requirements, use exact client language when possible
+7. NUMBERS: Convert written numbers to digits (e.g., "two hundred fifty thousand" = 250000)
+8. ADDRESSES: Extract complete address exactly as stated, fix obvious typos
 
 Process this transcript and return ONLY the JSON:"""
 
             print("\nExtracting renovation information...")
             info_response = self.client.chat.completions.create(
-                model="gpt-4-turbo-preview",
+                model="gpt-4o",  # Use the latest and most capable model
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that extracts structured information from renovation consultation transcripts."},
+                    {"role": "system", "content": "You are an expert renovation consultant assistant that extracts comprehensive, detailed information from consultation transcripts. You pay close attention to budget numbers, timelines, specific requirements, and client constraints."},
                     {"role": "user", "content": info_prompt},
                     {"role": "user", "content": cleaned_transcript}
                 ],
                 temperature=0,
-                max_tokens=2000,
+                max_tokens=4000,  # Increase token limit for more detailed extraction
                 response_format={"type": "json_object"}
             )
             
@@ -198,14 +223,14 @@ Process this transcript and return ONLY the JSON:"""
 
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4-turbo-preview",
+                model="gpt-4o",  # Use the latest model
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that extracts addresses from text and corrects spelling mistakes in street names using context and common NYC/Brooklyn street names."},
+                    {"role": "system", "content": "You are a helpful assistant that extracts addresses from text and corrects spelling mistakes in street names using context and common street names."},
                     {"role": "user", "content": prompt},
                     {"role": "user", "content": transcript}
                 ],
                 temperature=0,
-                max_tokens=100
+                max_tokens=150
             )
             addr = response.choices[0].message.content.strip()
             if addr and addr.lower() != 'none' and len(addr) > 8:
@@ -304,14 +329,14 @@ Process this transcript and return ONLY the JSON:"""
 
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4-turbo-preview",
+                model="gpt-4o",  # Use the latest model
                 messages=[
                     {"role": "system", "content": "You are a helpful assistant that analyzes client behavior and preferences."},
                     {"role": "user", "content": prompt},
                     {"role": "user", "content": transcript}
                 ],
                 temperature=0,
-                max_tokens=1000
+                max_tokens=1500
             )
             
             return json.loads(response.choices[0].message.content)
