@@ -88,13 +88,15 @@ def clean_address(address: str) -> str:
     """Clean and standardize address format"""
     address = ' '.join(address.split())
     address = re.sub(r'(?i)\b(apartment|apt\.?|unit)\s*#?\s*(\w+)', r'Apt \2', address)
+    # Only expand abbreviations that are clearly street names, not state abbreviations
+    # Use word boundaries and context to avoid changing state abbreviations
     abbr = {
-        r'\bPl\b\.?' : 'Place',
-        r'\bSt\b\.?' : 'Street',
-        r'\bAve\b\.?' : 'Avenue',
-        r'\bRd\b\.?' : 'Road',
-        r'\bCt\b\.?' : 'Court',
+        r'\b(\d+\s+\w+\s+)Pl\b\.?' : r'\1Place',  # Only expand Pl when it's clearly a street
+        r'\b(\d+\s+\w+\s+)St\b\.?' : r'\1Street',  # Only expand St when it's clearly a street
+        r'\b(\d+\s+\w+\s+)Ave\b\.?' : r'\1Avenue',
+        r'\b(\d+\s+\w+\s+)Rd\b\.?' : r'\1Road',
         r'\bPkwy\b\.?' : 'Parkway'
+        # Don't expand Ct as it could be Connecticut
     }
     for pat, repl in abbr.items():
         address = re.sub(pat, repl, address, flags=re.IGNORECASE)
@@ -129,15 +131,21 @@ def process_transcript_and_generate_report(transcript_path: str, address: str = 
         transcript_info = transcript_processor_obj.extract_info(transcript)
         logger.info("Transcript processed successfully")
 
-        # Use provided address first, then extract from transcript as fallback
+        # Use provided address first, then check transcript_info, then extract separately
         if address:
             logger.info(f"Using provided address: {address}")
         else:
-            logger.info("No address provided, extracting from transcript...")
-            address = transcript_processor_obj.extract_address(transcript)
-            if address:
-                logger.info(f"Extracted address from transcript: {address}")
+            # Check if address was extracted in transcript_info
+            transcript_address = transcript_info.get('property_address')
+            if transcript_address and transcript_address.strip() and transcript_address.upper() != 'NONE':
+                address = transcript_address
+                logger.info(f"Using address from transcript info: {address}")
             else:
+                logger.info("No address in transcript info, extracting separately...")
+                address = transcript_processor_obj.extract_address(transcript)
+                if address and address.upper() != 'NONE':
+                    logger.info(f"Extracted address from transcript: {address}")
+                else:
                 logger.info("Could not extract address from transcript, trying filename...")
                 # Try to match any plausible address substring
                 fname = Path(transcript_path).stem.replace('_', ' ').replace('-', ' ')
@@ -159,10 +167,13 @@ def process_transcript_and_generate_report(transcript_path: str, address: str = 
         
         if address:
             address = clean_address(address)
-            # Add Brooklyn, NY if not present
-            if re.match(r"\d+\s*[NSEW]?\s*\d*\s*\w+\s*(st|street|ave|avenue|rd|road|blvd|drive|dr|pl|place)", address, re.IGNORECASE):
-                if not re.search(r",\s*(brooklyn|manhattan|queens|bronx|new york|ny|nyc|jersey|miami|ct|connecticut|westchester)", address, re.IGNORECASE):
-                    address += ", Brooklyn, NY"
+            # Only add Brooklyn, NY if the address doesn't already have a city, state
+            # Check if address already has a proper city, state format
+            if not re.search(r",\s*[A-Za-z\s]+,\s*[A-Z]{2}\s*\d{5}", address):
+                # Only add if it looks like a street address without city/state
+                if re.match(r"\d+\s*[NSEW]?\s*\d*\s*\w+\s*(st|street|ave|avenue|rd|road|blvd|drive|dr|pl|place)", address, re.IGNORECASE):
+                    if not re.search(r",\s*(brooklyn|manhattan|queens|bronx|new york|ny|nyc|nj|jersey|miami|fl|florida|ct|connecticut|westchester)", address, re.IGNORECASE):
+                        address += ", Brooklyn, NY"
 
         logger.info(f"Using address: {address}")
 

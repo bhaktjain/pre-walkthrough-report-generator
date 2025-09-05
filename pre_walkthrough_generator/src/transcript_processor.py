@@ -48,61 +48,62 @@ class TranscriptProcessor:
             # Directly extract renovation and client information (no property ID)
             info_prompt = """Extract structured information from this renovation consultation transcript.
 
-Return ONLY valid JSON matching this exact structure (property_id can be null):
+Return ONLY valid JSON matching this exact structure:
 {
+    "property_address": string or null,  // The complete property address being renovated
     "property_info": {
-        "building_type": string,
+        "building_type": string,  // e.g., "house", "condo", "co-op", "townhouse"
         "total_units": number or null,
         "year_built": number or null,
-        "building_rules": string[],
-        "building_features": string[],
-        "realtor_property_id": string or null  // Use the provided property ID or null
+        "building_rules": string[],  // Any building/co-op rules mentioned
+        "building_features": string[],  // Building amenities, features
+        "realtor_property_id": string or null
     },
     "client_info": {
-        "names": string[],
-        "phone": string,
-        "profession": string,
+        "names": string[],  // All client names mentioned
+        "phone": string,  // Phone number if mentioned
+        "profession": string,  // Client's job/profession if mentioned
         "preferences": {
-            "budget_sensitivity": string,
-            "decision_making": string,
-            "design_involvement": string,
-            "quality_preference": string
+            "budget_sensitivity": string,  // How price-conscious they seem
+            "decision_making": string,  // How they make decisions
+            "design_involvement": string,  // How involved they want to be in design
+            "quality_preference": string  // Their quality expectations
         },
-        "constraints": string[],
+        "constraints": string[],  // Any limitations or constraints mentioned
         "red_flags": {
-            "is_negative_reviewer": boolean,
-            "payment_concerns": boolean,
-            "unrealistic_expectations": boolean,
-            "communication_issues": boolean
+            "is_negative_reviewer": boolean,  // Do they seem like they might leave bad reviews?
+            "payment_concerns": boolean,  // Any concerns about their ability to pay?
+            "unrealistic_expectations": boolean,  // Do they have unrealistic expectations?
+            "communication_issues": boolean  // Any communication red flags?
         }
     },
     "renovation_scope": {
         "kitchen": {
-            "description": string,
+            "description": string,  // Brief description of kitchen work needed
             "estimated_cost": {
                 "range": {
-                    "min": number,
-                    "max": number or null
+                    "min": number,  // Minimum budget mentioned (extract actual numbers)
+                    "max": number or null  // Maximum budget if range given
                 }
             },
-            "plumbing_changes": string,
-            "electrical_changes": string,
-            "specific_requirements": string[],
-            "appliances": string[],
+            "plumbing_changes": string,  // Any plumbing work mentioned
+            "electrical_changes": string,  // Any electrical work mentioned
+            "specific_requirements": string[],  // Specific things they want
+            "appliances": string[],  // Appliances mentioned
             "cabinets_and_countertops": {
-                "type": string,
-                "preferences": string[]
+                "type": string,  // Type of cabinets/counters wanted
+                "preferences": string[]  // Specific preferences
             },
-            "constraints": string[]
+            "constraints": string[]  // Any limitations or constraints
         },
         "bathrooms": {
-            "count": number or null,
-            "cost_per_bathroom": number or null,
-            "plumbing_changes": string,
-            "specific_requirements": string[],
-            "fixtures": string[],
-            "finishes": string[],
-            "constraints": string[]
+            "count": number or null,  // How many bathrooms to renovate (extract as number, e.g., 2.5)
+            "cost_per_bathroom": number or null,  // Budget per bathroom if mentioned
+            "plumbing_changes": string,  // Plumbing work needed
+            "specific_requirements": string[],  // Specific bathroom requirements
+            "fixtures": string[],  // Fixtures mentioned (toilet, sink, etc.)
+            "finishes": string[],  // Finishes mentioned (tile, etc.)
+            "constraints": string[]  // Any bathroom constraints
         },
         "additional_work": {
             "rooms": string[],
@@ -137,7 +138,15 @@ Return ONLY valid JSON matching this exact structure (property_id can be null):
     }
 }
 
-Process this transcript and return the JSON:"""
+IMPORTANT INSTRUCTIONS:
+- Extract the EXACT property address as mentioned in the transcript
+- For budget numbers, extract actual dollar amounts mentioned (e.g., if they say "forty thousand" extract 40000)
+- For bathroom count, include decimals if mentioned (e.g., "2.5 bathrooms" = 2.5)
+- Be specific and detailed in requirements arrays - include exact quotes when possible
+- If information is not mentioned, use empty string "" or null, not "not provided"
+- Focus on actionable, specific information that would help a contractor prepare
+
+Process this transcript and return ONLY the JSON:"""
 
             print("\nExtracting renovation information...")
             info_response = self.client.chat.completions.create(
@@ -168,18 +177,23 @@ Process this transcript and return the JSON:"""
 
     def extract_address(self, transcript: str) -> str:
         prompt = """
-        Extract the single most likely full street address mentioned in this transcript.
-        Only output addresses located in: New York (all boroughs), New Jersey, Westchester County NY, Connecticut, or Miami-Dade FL.
-
-        Normalise rules:
-        • Expand abbreviations: Pl→Place, St→Street, Ave→Avenue, Rd→Road, Ct→Court, Pkwy→Parkway.
-        • Convert spelled-out numbers to digits.
-        • Convert Apartment/Apt/Unit variations to "Apt N".
-        • Include 5-digit ZIP.
-        • If you detect a likely spelling mistake in the street name (e.g. "Pierpont" instead of "Pierrepont"), correct it using context and common NYC/Brooklyn street names. Use fuzzy matching and context to infer the correct spelling if possible.
-        • If the transcript contains a street name that is a close match to a well-known street in the area, correct the spelling to the canonical name.
-
-        Output exactly: "number Street Name[, Apt X], City, State ZIP" – one line, no extra text.
+        Extract the complete property address mentioned in this renovation consultation transcript.
+        
+        Look for the property address that the client wants renovated. This will typically be mentioned early in the conversation.
+        
+        Rules:
+        • Return the EXACT address as mentioned, preserving the original format
+        • Include apartment/unit numbers if mentioned (e.g., "#M7", "Apt 3B", "Unit 5")
+        • Include the full city, state, and ZIP code
+        • Do NOT modify or "correct" street names unless there's an obvious typo
+        • Do NOT change abbreviations unless they're clearly wrong
+        
+        Examples of good output:
+        - "268 Babbitt Road #M7, Bedford, NY 10507"
+        - "1001 Unquowa Road, Fairfield, CT 06824"
+        - "123 Main Street, Apt 4B, Brooklyn, NY 11201"
+        
+        Output ONLY the address, nothing else. If no clear address is found, output "NONE".
         """
 
         try:

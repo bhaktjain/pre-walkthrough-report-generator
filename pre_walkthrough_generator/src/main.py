@@ -20,14 +20,15 @@ def clean_address(address: str) -> str:
     address = ' '.join(address.split())
     # Convert apartment/unit variations to standard format
     address = re.sub(r'(?i)\b(apartment|apt\.?|unit)\s*#?\s*(\w+)', r'Apt \2', address)
-    # Expand common street abbreviations
+    # Only expand abbreviations that are clearly street names, not state abbreviations
+    # Use word boundaries and context to avoid changing state abbreviations
     abbr = {
-        r'\bPl\b\.?' : 'Place',
-        r'\bSt\b\.?' : 'Street',
-        r'\bAve\b\.?' : 'Avenue',
-        r'\bRd\b\.?' : 'Road',
-        r'\bCt\b\.?' : 'Court',
+        r'\b(\d+\s+\w+\s+)Pl\b\.?' : r'\1Place',  # Only expand Pl when it's clearly a street
+        r'\b(\d+\s+\w+\s+)St\b\.?' : r'\1Street',  # Only expand St when it's clearly a street
+        r'\b(\d+\s+\w+\s+)Ave\b\.?' : r'\1Avenue',
+        r'\b(\d+\s+\w+\s+)Rd\b\.?' : r'\1Road',
         r'\bPkwy\b\.?' : 'Parkway'
+        # Don't expand Ct as it could be Connecticut
     }
     for pat, repl in abbr.items():
         address = re.sub(pat, repl, address, flags=re.IGNORECASE)
@@ -126,10 +127,13 @@ def main():
                     address = fname + ", Brooklyn, NY"
             if address:
                 address = clean_address(address)
-                # If address looks like '34N 7th st apt 7t' or similar, add Brooklyn, NY
-                if re.match(r"\d+\s*[NSEW]?\s*\d*\s*\w+\s*(st|street|ave|avenue|rd|road|blvd|drive|dr|pl|place)", address, re.IGNORECASE):
-                    if not re.search(r",\s*(brooklyn|manhattan|queens|bronx|new york|ny|nyc|jersey|miami|ct|connecticut|westchester)", address, re.IGNORECASE):
-                        address += ", Brooklyn, NY"
+                # Only add Brooklyn, NY if the address doesn't already have a city, state
+                # Check if address already has a proper city, state format
+                if not re.search(r",\s*[A-Za-z\s]+,\s*[A-Z]{2}\s*\d{5}", address):
+                    # Only add if it looks like a street address without city/state
+                    if re.match(r"\d+\s*[NSEW]?\s*\d*\s*\w+\s*(st|street|ave|avenue|rd|road|blvd|drive|dr|pl|place)", address, re.IGNORECASE):
+                        if not re.search(r",\s*(brooklyn|manhattan|queens|bronx|new york|ny|nyc|nj|jersey|miami|fl|florida|ct|connecticut|westchester)", address, re.IGNORECASE):
+                            address += ", Brooklyn, NY"
             else:
                 address = ""
 
