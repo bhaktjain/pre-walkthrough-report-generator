@@ -130,6 +130,17 @@ def process_transcript_and_generate_report(transcript_path: str, address: str = 
         # Extract transcript information
         transcript_info = transcript_processor_obj.extract_info(transcript)
         logger.info("Transcript processed successfully")
+        
+        # Validate that we have meaningful data to generate a report
+        if not transcript_info or not any([
+            transcript_info.get('property_address'),
+            transcript_info.get('client_info', {}).get('names'),
+            transcript_info.get('renovation_scope', {}).get('kitchen', {}).get('description'),
+            transcript_info.get('renovation_scope', {}).get('bathrooms', {}).get('specific_requirements'),
+            transcript_info.get('renovation_scope', {}).get('additional_work', {}).get('rooms')
+        ]):
+            logger.warning("No meaningful consultation data found in transcript")
+            raise Exception("The provided transcript does not contain sufficient consultation information to generate a meaningful report. Please provide a transcript from a renovation consultation that includes project details, client information, or scope of work.")
 
         # Use provided address first, then check transcript_info, then extract separately
         if address:
@@ -324,13 +335,32 @@ async def generate_report_from_text(request: TranscriptRequest):
     """
     try:
         logger.info("Received request to generate report from text")
+        
+        # Validate transcript content
+        if not request.transcript_text or not request.transcript_text.strip():
+            logger.error("Empty or missing transcript text")
+            raise HTTPException(status_code=400, detail="Transcript text is required and cannot be empty")
+        
         # Flatten JSONL if needed
         flattened = flatten_jsonl_transcript(request.transcript_text)
+        
+        # Additional validation after flattening
+        if not flattened or not flattened.strip():
+            logger.error("Transcript text is empty after processing")
+            raise HTTPException(status_code=400, detail="Transcript text appears to be empty or invalid")
+        
+        # Check if transcript has meaningful content (not just whitespace/formatting)
+        meaningful_content = re.sub(r'[{}":\s\n\r]', '', flattened)
+        if len(meaningful_content) < 50:  # Arbitrary threshold for meaningful content
+            logger.error(f"Transcript appears to have insufficient content: {len(meaningful_content)} characters")
+            raise HTTPException(status_code=400, detail="Transcript text appears to have insufficient content for report generation")
+        
         # Create a temporary file with the transcript text
         with tempfile.NamedTemporaryFile(delete=False, suffix=".txt", mode='w') as temp_file:
             temp_file.write(flattened)
             temp_file_path = temp_file.name
         logger.info(f"Saved transcript text to temporary file: {temp_file_path}")
+        
         # Generate the report
         report_path = process_transcript_and_generate_report(
             transcript_path=temp_file_path,

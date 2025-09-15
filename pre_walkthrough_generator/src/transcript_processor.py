@@ -44,6 +44,22 @@ class TranscriptProcessor:
         # Clean the transcript first
         cleaned_transcript = transcript.strip()
         
+        # Validate transcript has meaningful content
+        if not cleaned_transcript:
+            logger.warning("Empty transcript provided")
+            return self._get_empty_template()
+        
+        # Check for minimal consultation indicators
+        consultation_indicators = [
+            'renovation', 'remodel', 'construction', 'project', 'budget', 'cost',
+            'kitchen', 'bathroom', 'bedroom', 'addition', 'contractor', 'architect'
+        ]
+        
+        transcript_lower = cleaned_transcript.lower()
+        if not any(indicator in transcript_lower for indicator in consultation_indicators):
+            logger.warning("Transcript doesn't appear to contain renovation consultation content")
+            return self._get_empty_template()
+        
         try:
             # Directly extract renovation and client information (no property ID)
             info_prompt = """Extract comprehensive structured information from this renovation/construction consultation transcript. This could be any type of project: kitchen renovation, bathroom remodel, home addition, whole-house renovation, commercial project, etc. Pay special attention to budget numbers, timelines, specific project requirements, and client constraints.
@@ -203,7 +219,108 @@ Process this transcript and return ONLY the JSON:"""
             
         except Exception as e:
             print(f"\nError extracting information: {e}")
-            return {}
+            return self._get_empty_template()
+    
+    def _get_empty_template(self) -> Dict[str, Any]:
+        """Return an empty template structure when no meaningful transcript is provided"""
+        return {
+            "property_address": "",
+            "property_info": {
+                "building_type": "",
+                "total_units": None,
+                "year_built": None,
+                "building_rules": [],
+                "building_features": [],
+                "realtor_property_id": None
+            },
+            "client_info": {
+                "names": [],
+                "phone": "",
+                "profession": "",
+                "preferences": {
+                    "budget_sensitivity": "",
+                    "decision_making": "",
+                    "design_involvement": "",
+                    "quality_preference": ""
+                },
+                "constraints": [],
+                "red_flags": {
+                    "is_negative_reviewer": False,
+                    "payment_concerns": False,
+                    "unrealistic_expectations": False,
+                    "communication_issues": False
+                }
+            },
+            "renovation_scope": {
+                "kitchen": {
+                    "description": "",
+                    "estimated_cost": {"range": {"min": 0, "max": None}},
+                    "plumbing_changes": "",
+                    "electrical_changes": "",
+                    "specific_requirements": [],
+                    "appliances": [],
+                    "cabinets_and_countertops": {"type": "", "preferences": []},
+                    "constraints": []
+                },
+                "bathrooms": {
+                    "count": None,
+                    "cost_per_bathroom": None,
+                    "plumbing_changes": "",
+                    "specific_requirements": [],
+                    "fixtures": [],
+                    "finishes": [],
+                    "constraints": []
+                },
+                "additional_work": {
+                    "rooms": [],
+                    "structural_changes": [],
+                    "systems_updates": [],
+                    "custom_features": [],
+                    "estimated_costs": {
+                        "per_sqft_cost": None,
+                        "total_estimated_range": {"min": None, "max": None},
+                        "architect_fees": {"percentage": None, "estimated_amount": None},
+                        "additional_fees": []
+                    }
+                },
+                "timeline": {
+                    "total_duration": "",
+                    "phasing": "",
+                    "living_arrangements": "",
+                    "constraints": [],
+                    "key_dates": {
+                        "survey_completion": "",
+                        "walkthrough_scheduled": "",
+                        "project_start": "",
+                        "other_milestones": []
+                    }
+                }
+            },
+            "materials_and_design": {
+                "sourcing_responsibility": "",
+                "specific_materials": [],
+                "style_preferences": [],
+                "quality_preferences": [],
+                "trade_discounts": [],
+                "reuse_materials": []
+            },
+            "project_management": {
+                "client_involvement": "",
+                "design_services": [],
+                "documentation_needs": [],
+                "permit_requirements": [],
+                "contractor_requirements": [],
+                "communication_preferences": "",
+                "decision_process": "",
+                "company_details": {
+                    "company_name": "",
+                    "contact_person": "",
+                    "services_offered": [],
+                    "fees_structure": [],
+                    "process_description": ""
+                }
+            }
+        }
 
     def extract_address(self, transcript: str) -> str:
         prompt = """
