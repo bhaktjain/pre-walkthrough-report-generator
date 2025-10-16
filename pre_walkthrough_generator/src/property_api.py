@@ -544,59 +544,124 @@ class PropertyAPI:
     def _scrape_property_id_duckduckgo(self, address: str) -> Optional[str]:
         """Search DuckDuckGo for the realtor listing and extract property ID."""
         try:
-            query = urllib.parse.quote_plus(f"{address} site:realtor.com")
-            url = f"https://duckduckgo.com/html/?q={query}"
-            logger.info(f"DuckDuckGo search URL: {url}")
+            import random
+            import time
             
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            }
-            resp = requests.get(url, headers=headers, timeout=10)
-            logger.info(f"DuckDuckGo response status: {resp.status_code}")
+            # Clean address for better search
+            clean_address = address.replace("#", " ").replace(",", "")
             
-            if resp.status_code != 200:
-                logger.warning(f"DuckDuckGo returned status {resp.status_code}")
-                return None
-                
-            soup = BeautifulSoup(resp.text, "html.parser")
-            results = soup.select('a.result__a')
-            logger.info(f"Found {len(results)} search results")
+            # Try multiple search variations
+            search_queries = [
+                f"{clean_address} site:realtor.com",
+                f'"{clean_address}" site:realtor.com',
+                f"{clean_address} realtor.com",
+                f'"{address}" realtor.com'
+            ]
             
-            realtor_urls_found = []
-            for a in results:
-                href = a.get('href', '')
-                # DuckDuckGo wraps links: /l/?uddg=<URL-ENCODED>
-                if 'uddg=' in href:
-                    real_url = urllib.parse.parse_qs(urllib.parse.urlparse(href).query).get('uddg', [None])[0]
-                else:
-                    real_url = href
+            session = requests.Session()
+            
+            for query in search_queries:
+                try:
+                    # Enhanced headers to avoid bot detection
+                    headers = {
+                        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                        "Accept-Language": "en-US,en;q=0.9",
+                        "Accept-Encoding": "gzip, deflate",  # Avoid br compression
+                        "DNT": "1",
+                        "Connection": "keep-alive",
+                        "Upgrade-Insecure-Requests": "1",
+                        "Sec-Fetch-Dest": "document",
+                        "Sec-Fetch-Mode": "navigate",
+                        "Sec-Fetch-Site": "none",
+                        "Sec-Fetch-User": "?1"
+                    }
                     
-                if real_url and 'realtor.com' in real_url:
-                    realtor_urls_found.append(real_url)
-                    logger.info(f"Found Realtor.com URL: {real_url}")
+                    # Use the HTML interface for non-JavaScript access
+                    encoded_query = urllib.parse.quote_plus(query)
+                    url = f"https://duckduckgo.com/html/?q={encoded_query}"
                     
-                    if 'realestateandhomes-detail' in real_url:
-                        # Check if the URL contains the specific apartment number from the search
-                        original_apt = self._extract_apartment_from_address(address)
-                        if original_apt:
-                            url_apt = self._extract_apartment_from_url(real_url)
-                            if url_apt and url_apt.lower() != original_apt.lower():
-                                logger.info(f"Apartment mismatch: searched for {original_apt}, found {url_apt}")
-                                continue  # Skip this result, look for exact apartment match
-                        
-                        match = re.search(r'_M([\d-]+)', real_url)
-                        if match:
-                            numeric = match.group(1).replace('-', '')
-                            if numeric.isdigit():
-                                logger.info(f"Extracted property ID: {numeric}")
-                                return numeric
+                    logger.info(f"DuckDuckGo search URL: {url}")
+                    
+                    # Add random delay to avoid rate limiting
+                    time.sleep(random.uniform(1, 3))
+                    
+                    resp = session.get(url, headers=headers, timeout=15)
+                    logger.info(f"DuckDuckGo response status: {resp.status_code}")
+                    
+                    if resp.status_code == 202:
+                        logger.warning("DuckDuckGo returned status 202 - request accepted but not processed")
+                        continue
+                    elif resp.status_code != 200:
+                        logger.warning(f"DuckDuckGo returned status {resp.status_code}")
+                        continue
+                    
+                    # Check response length to ensure we got actual content
+                    logger.info(f"DuckDuckGo response length: {len(resp.text)} chars")
+                    if len(resp.text) < 5000:
+                        logger.warning(f"DuckDuckGo returned short response ({len(resp.text)} chars)")
+                        continue
+                    
+                    # Debug: Log response details
+                    logger.info(f"DuckDuckGo HTML response received successfully")
+                    
+                    # Look for realtor.com URLs in the response text
+                    realtor_urls = re.findall(r'https://www\.realtor\.com/realestateandhomes-detail/[^"]*_M([\d-]+)', resp.text)
+                    
+                    if realtor_urls:
+                        logger.info(f"Found {len(realtor_urls)} property IDs in response")
+                        for prop_id in realtor_urls:
+                            clean_id = prop_id.replace('-', '')
+                            if clean_id.isdigit() and len(clean_id) >= 8:
+                                logger.info(f"Extracted property ID: {clean_id}")
+                                return clean_id
+                    
+                    # Also try parsing with BeautifulSoup for structured results
+                    soup = BeautifulSoup(resp.text, "html.parser")
+                    
+                    # Look for various link selectors that DuckDuckGo might use
+                    selectors = [
+                        'a[href*="realtor.com"]',
+                        '.result a[href*="realtor.com"]',
+                        '.web-result a[href*="realtor.com"]',
+                        'a.result__a',
+                        '.links_main a[href*="realtor.com"]'
+                    ]
+                    
+                    realtor_urls_found = []
+                    for selector in selectors:
+                        links = soup.select(selector)
+                        for link in links:
+                            href = link.get('href', '')
                             
-            logger.info(f"Total Realtor.com URLs found: {len(realtor_urls_found)}")
-            if not realtor_urls_found:
-                logger.warning("No Realtor.com URLs found in search results")
-            else:
-                logger.warning("Found Realtor.com URLs but none were property detail pages with IDs")
-                
+                            # Handle DuckDuckGo redirect URLs
+                            if '/l/?uddg=' in href:
+                                try:
+                                    real_url = urllib.parse.unquote(href.split('uddg=')[1].split('&')[0])
+                                except:
+                                    real_url = href
+                            else:
+                                real_url = href
+                            
+                            if real_url and 'realtor.com' in real_url and 'realestateandhomes-detail' in real_url:
+                                realtor_urls_found.append(real_url)
+                                logger.info(f"Found Realtor.com URL: {real_url}")
+                                
+                                # Extract property ID
+                                match = re.search(r'_M([\d-]+)', real_url)
+                                if match:
+                                    numeric = match.group(1).replace('-', '')
+                                    if numeric.isdigit() and len(numeric) >= 8:
+                                        logger.info(f"Extracted property ID from structured result: {numeric}")
+                                        return numeric
+                    
+                    logger.info(f"Query '{query}' found {len(realtor_urls_found)} realtor URLs but no valid property IDs")
+                    
+                except Exception as e:
+                    logger.error(f"Error with query '{query}': {e}")
+                    continue
+            
+            logger.warning("All DuckDuckGo search queries failed to find property ID")
             return None
         except Exception as e:
             logger.error(f"Error in DuckDuckGo scraping: {e}")
