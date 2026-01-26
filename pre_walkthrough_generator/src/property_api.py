@@ -397,20 +397,80 @@ class PropertyAPI:
         return None
 
     def get_property_id(self, address: str) -> Optional[str]:
-        """High-level helper to get property ID via web scraping."""
+        """High-level helper to get property ID via multiple strategies."""
         logger.info(f"Getting property ID for: {address}")
         
-        # Check if BeautifulSoup4 is available
-        logger.info(f"BeautifulSoup4 available: {HAS_BS4}")
+        # Strategy 1: Try SerpAPI if configured (most reliable)
+        if self.serpapi_key:
+            logger.info("Trying SerpAPI (Google Search)...")
+            prop_id = self._get_property_id_serpapi(address)
+            if prop_id:
+                logger.info(f"SerpAPI returned property ID: {prop_id}")
+                return prop_id
         
-        # Skip OpenAI method and go directly to web scraping
+        # Strategy 2: Try web scraping if BeautifulSoup4 is available
         if HAS_BS4:
-            logger.info("Attempting web scraping via DuckDuckGo...")
-            pid = self._scrape_property_id_duckduckgo(address)
-            logger.info(f"Web scrape returned property ID: {pid}")
-            return pid
+            logger.info("Trying web scraping methods...")
+            
+            # 2a: Try Realtor.com site search first (more reliable than DuckDuckGo)
+            logger.info("Attempting Realtor.com site search...")
+            realtor_url = self._realtor_site_search_url(address)
+            if realtor_url:
+                prop_id = self.extract_property_id_from_url(realtor_url)
+                if prop_id:
+                    logger.info(f"Realtor.com site search returned property ID: {prop_id}")
+                    return prop_id
+            
+            # 2b: Try DuckDuckGo as fallback
+            logger.info("Attempting DuckDuckGo search...")
+            prop_id = self._scrape_property_id_duckduckgo(address)
+            if prop_id:
+                logger.info(f"DuckDuckGo returned property ID: {prop_id}")
+                return prop_id
         else:
             logger.warning("BeautifulSoup4 not available, cannot perform web scraping")
+        
+        logger.warning("All property ID lookup methods failed")
+        return None
+    
+    def _get_property_id_serpapi(self, address: str) -> Optional[str]:
+        """Get property ID using SerpAPI (Google Search) - Most reliable method."""
+        if not self.serpapi_key:
+            return None
+        
+        try:
+            # Search Google for the property on Realtor.com
+            params = {
+                "engine": "google",
+                "q": f"{address} site:realtor.com/realestateandhomes-detail",
+                "num": "5",
+                "api_key": self.serpapi_key,
+            }
+            
+            logger.info(f"SerpAPI query: {params['q']}")
+            resp = requests.get("https://serpapi.com/search.json", params=params, timeout=15)
+            logger.info(f"SerpAPI status: {resp.status_code}")
+            
+            if resp.status_code != 200:
+                logger.warning(f"SerpAPI returned status {resp.status_code}")
+                return None
+            
+            data = resp.json()
+            
+            # Look through organic results for Realtor.com links
+            for result in data.get("organic_results", []):
+                link = result.get("link", "")
+                if 'realtor.com/realestateandhomes-detail' in link:
+                    logger.info(f"Found Realtor.com link: {link}")
+                    prop_id = self.extract_property_id_from_url(link)
+                    if prop_id:
+                        return prop_id
+            
+            logger.info("No property ID found in SerpAPI results")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error in SerpAPI lookup: {e}")
             return None
 
     def get_all_property_data(self, address: str) -> Dict[str, Any]:
