@@ -563,14 +563,19 @@ class PropertyAPI:
                 city = parts[-2].replace(' ', '-')
             logger.info(f"City slug: {city}")
             
-            state_zip = parts[-1].split()
-            if len(state_zip) < 2:
+            state_zip = parts[-1].strip().split()
+            if len(state_zip) < 1:
                 logger.info(f"Invalid state_zip format: {parts[-1]}")
                 return None
-            state = state_zip[0]
-            zip_code = state_zip[1]
             
-            slug = f"{street}_{city}_{state}_{zip_code}"
+            state = state_zip[0]
+            # Handle case where zip might be missing
+            zip_code = state_zip[1] if len(state_zip) > 1 else ""
+            
+            if zip_code:
+                slug = f"{street}_{city}_{state}_{zip_code}"
+            else:
+                slug = f"{street}_{city}_{state}"
             logger.info(f"Final slug: {slug}")
             return slug
         except Exception as e:
@@ -607,15 +612,17 @@ class PropertyAPI:
             import random
             import time
             
-            # Clean address for better search
-            clean_address = address.replace("#", " ").replace(",", "")
+            # Extract key components for better matching
+            # Remove unit/apt for initial search to avoid confusion
+            base_address = re.sub(r'\s*[#,]?\s*(apt|apartment|unit)\s*[a-zA-Z0-9]+', '', address, flags=re.IGNORECASE)
+            base_address = re.sub(r'\s*#[a-zA-Z0-9]+', '', base_address)
             
-            # Try multiple search variations
+            # Try multiple search variations with increasing specificity
             search_queries = [
-                f"{clean_address} site:realtor.com",
-                f'"{clean_address}" site:realtor.com',
-                f"{clean_address} realtor.com",
-                f'"{address}" realtor.com'
+                f'"{base_address}" site:realtor.com/realestateandhomes-detail',  # Most specific first
+                f"{base_address} site:realtor.com/realestateandhomes-detail",
+                f'"{address}" site:realtor.com',
+                f"{address} realtor.com"
             ]
             
             session = requests.Session()
@@ -666,15 +673,47 @@ class PropertyAPI:
                     logger.info(f"DuckDuckGo HTML response received successfully")
                     
                     # Look for realtor.com URLs in the response text
-                    realtor_urls = re.findall(r'https://www\.realtor\.com/realestateandhomes-detail/[^"]*_M([\d-]+)', resp.text)
+                    # Extract both URL and surrounding text for validation
+                    url_pattern = r'https://www\.realtor\.com/realestateandhomes-detail/([^"]*?)_M([\d-]+)'
+                    matches = re.findall(url_pattern, resp.text)
                     
-                    if realtor_urls:
-                        logger.info(f"Found {len(realtor_urls)} property IDs in response")
-                        for prop_id in realtor_urls:
+                    if matches:
+                        logger.info(f"Found {len(matches)} potential property URLs in response")
+                        
+                        # Validate each match against the original address
+                        for url_slug, prop_id in matches:
                             clean_id = prop_id.replace('-', '')
                             if clean_id.isdigit() and len(clean_id) >= 8:
-                                logger.info(f"Extracted property ID: {clean_id}")
-                                return clean_id
+                                # Extract street name from URL slug for validation
+                                # URL format: "20-Confucius-Plaza_New-York_NY_10002"
+                                url_parts = url_slug.split('_')
+                                if url_parts:
+                                    url_street = url_parts[0].replace('-', ' ').lower()
+                                    # Check if key address components match
+                                    address_lower = base_address.lower()
+                                    
+                                    # Extract street name from address (first part before comma)
+                                    addr_street = address_lower.split(',')[0].strip() if ',' in address_lower else address_lower
+                                    
+                                    # Simple validation: check if main street name components are present
+                                    # For "20 Confucius Plaza" we want to match "confucius"
+                                    addr_words = set(addr_street.split())
+                                    url_words = set(url_street.split())
+                                    
+                                    # Find significant words (not numbers, not common words)
+                                    significant_addr_words = {w for w in addr_words if len(w) > 3 and not w.isdigit()}
+                                    significant_url_words = {w for w in url_words if len(w) > 3 and not w.isdigit()}
+                                    
+                                    # Check if at least one significant word matches
+                                    if significant_addr_words & significant_url_words:
+                                        logger.info(f"Validated property ID {clean_id} - address match confirmed")
+                                        logger.info(f"URL slug: {url_slug}")
+                                        return clean_id
+                                    else:
+                                        logger.warning(f"Property ID {clean_id} rejected - address mismatch")
+                                        logger.warning(f"Expected words: {significant_addr_words}, URL words: {significant_url_words}")
+                        
+                        logger.warning("Found property IDs but none matched the address validation")
                     
                     # Also try parsing with BeautifulSoup for structured results
                     soup = BeautifulSoup(resp.text, "html.parser")
