@@ -170,7 +170,8 @@ class PropertyAPI:
             print(f"[DEBUG] Last Sold Date: {last_sold_date}")
 
             # Bedrooms
-            bedrooms = d.get('description', {}).get('beds')
+            description = d.get('description') or {}
+            bedrooms = description.get('beds')
             if not bedrooms:
                 bedrooms = search_details('Bedrooms', r'Bedrooms: (\d+)')
             if not bedrooms:
@@ -184,7 +185,7 @@ class PropertyAPI:
             print(f"[DEBUG] Bedrooms: {bedrooms}")
 
             # Bathrooms
-            bathrooms = d.get('description', {}).get('baths') or d.get('description', {}).get('baths_consolidated')
+            bathrooms = description.get('baths') or description.get('baths_consolidated')
             if not bathrooms:
                 bathrooms = search_details('Bathrooms', r'Bathrooms: (\d+)')
             if not bathrooms:
@@ -206,14 +207,14 @@ class PropertyAPI:
             print(f"[DEBUG] Rooms: {rooms}")
 
             # Sqft
-            sqft = d.get('description', {}).get('sqft')
+            sqft = description.get('sqft')
             if not sqft:
                 sqft = search_details_any(r'(\d{3,5})\s*sqft')
             if not sqft:
                 # Try property_history
-                for hist in d.get('property_history', []):
+                for hist in (d.get('property_history') or []):
                     listing = hist.get('listing') or {}
-                    desc = listing.get('description', {}) if listing else {}
+                    desc = listing.get('description') or {}
                     if desc and desc.get('sqft'):
                         sqft = desc['sqft']
                         break
@@ -222,7 +223,7 @@ class PropertyAPI:
             print(f"[DEBUG] Sqft: {sqft}")
 
             # Year Built
-            year_built = d.get('description', {}).get('year_built')
+            year_built = description.get('year_built')
             if not year_built:
                 year_built = search_details_any(r'Year Built: (\d{4})')
             if not year_built:
@@ -242,7 +243,7 @@ class PropertyAPI:
             print(f"[DEBUG] HOA Fee: {hoa_fee}")
 
             # Property Type
-            property_type = d.get('description', {}).get('type') or d.get('description', {}).get('sub_type')
+            property_type = description.get('type') or description.get('sub_type')
             if not property_type:
                 property_type = search_details_any(r'Property Subtype: ([\w-]+)')
             if not property_type:
@@ -259,7 +260,7 @@ class PropertyAPI:
 
             # Neighborhood
             neighborhood = None
-            neighborhoods = d.get('location', {}).get('neighborhoods', [])
+            neighborhoods = (d.get('location') or {}).get('neighborhoods') or []
             if neighborhoods:
                 neighborhood = neighborhoods[0].get('name')
             if not neighborhood:
@@ -280,13 +281,14 @@ class PropertyAPI:
             photos = []
             floor_plans = []
             try:
-                for photo in d.get('photos', []):
+                photos_list = d.get('photos') or []
+                for photo in photos_list:
                     if not photo:
                         continue
                     href = photo.get('href')
                     if not href:
                         continue
-                    tags = [tag.get('label', '') for tag in (photo.get('tags', []) or []) if tag and tag.get('label')]
+                    tags = [tag.get('label', '') for tag in (photo.get('tags') or []) if tag and tag.get('label')]
                     if 'floor_plan' in tags:
                         floor_plans.append({"url": href, "description": "floor_plan"})
                     else:
