@@ -215,9 +215,26 @@ def process_transcript_and_generate_report(transcript_path: str, address: str = 
 
         # Generate report
         logger.info("Generating pre-walkthrough report...")
-        safe_addr = address.split(',')[0].replace(' ','_') if address else Path(transcript_path).stem
+        
+        # Sanitize address for filename - remove invalid characters
+        def sanitize_filename(text: str) -> str:
+            """Remove or replace invalid filename characters"""
+            # Replace invalid characters with underscore
+            invalid_chars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|', '#']
+            for char in invalid_chars:
+                text = text.replace(char, '_')
+            # Replace multiple underscores with single
+            while '__' in text:
+                text = text.replace('__', '_')
+            # Remove leading/trailing underscores
+            return text.strip('_')
+        
+        safe_addr = sanitize_filename(address.split(',')[0]) if address else Path(transcript_path).stem
+        safe_addr = safe_addr.replace(' ', '_')
+        
         if last_name:
-            file_name = f"PreWalk_{last_name}.docx"
+            safe_last_name = sanitize_filename(last_name)
+            file_name = f"PreWalk_{safe_last_name}.docx"
         else:
             file_name = f"PreWalk_{safe_addr}.docx"
         

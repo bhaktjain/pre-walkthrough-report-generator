@@ -709,8 +709,17 @@ class DocumentGenerator:
             
             # Save the document
             if not file_name:
-                # build from address
-                addr = data.get('property_address','report').split(',')[0].replace(' ','_')
+                # build from address - sanitize for filename
+                addr = data.get('property_address','report').split(',')[0]
+                # Remove invalid filename characters
+                invalid_chars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|', '#']
+                for char in invalid_chars:
+                    addr = addr.replace(char, '_')
+                addr = addr.replace(' ', '_')
+                # Replace multiple underscores with single
+                while '__' in addr:
+                    addr = addr.replace('__', '_')
+                addr = addr.strip('_')
                 file_name = f"PreWalk_{addr}.docx"
             output_path = output_dir / file_name
             self.doc.save(str(output_path))

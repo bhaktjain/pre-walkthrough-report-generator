@@ -184,7 +184,22 @@ def main():
 
             # Generate report
             print("\nGenerating pre-walkthrough report...")
-            safe_addr = address.split(',')[0].replace(' ','_') if address else transcript_path.stem
+            
+            # Sanitize address for filename
+            if address:
+                safe_addr = address.split(',')[0]
+                # Remove invalid filename characters
+                invalid_chars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|', '#']
+                for char in invalid_chars:
+                    safe_addr = safe_addr.replace(char, '_')
+                safe_addr = safe_addr.replace(' ', '_')
+                # Replace multiple underscores with single
+                while '__' in safe_addr:
+                    safe_addr = safe_addr.replace('__', '_')
+                safe_addr = safe_addr.strip('_')
+            else:
+                safe_addr = transcript_path.stem
+            
             output_path = doc_generator.generate_report(final_data, file_name=f"PreWalk_{safe_addr}.docx")
             if not output_path:
                 print("\nError generating report")
