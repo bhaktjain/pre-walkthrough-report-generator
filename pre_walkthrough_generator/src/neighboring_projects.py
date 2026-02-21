@@ -21,7 +21,7 @@ class NeighboringProjectsManager:
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.cache_file = self.cache_dir / "zoho_deals_cache.json"
-        self.cache_ttl_hours = 6  # Refresh every 6 hours
+        self.cache_ttl_hours = 168  # Refresh every 1 week (7 days * 24 hours)
         
     def _extract_neighborhood_from_address(self, address: str) -> Optional[str]:
         """

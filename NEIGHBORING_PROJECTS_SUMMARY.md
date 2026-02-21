@@ -46,7 +46,7 @@ A complete Zoho CRM integration that automatically adds neighboring projects to 
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│ 1. Sync (Every 6 hours via cron)                         │
+│ 1. Sync (Every week via cron)                            │
 │    python sync_zoho_deals.py                             │
 │    ↓                                                      │
 │    Fetches 910 deals from Zoho CRM                       │
@@ -98,8 +98,8 @@ A complete Zoho CRM integration that automatically adds neighboring projects to 
 # Add to crontab
 crontab -e
 
-# Run every 6 hours
-0 */6 * * * cd /path/to/project && python3 sync_zoho_deals.py >> sync.log 2>&1
+# Run every week (Sunday at midnight)
+0 0 * * 0 cd /path/to/project && python3 sync_zoho_deals.py >> sync.log 2>&1
 ```
 
 #### Option B: Render Cron Service
@@ -108,7 +108,7 @@ Add to `render.yaml`:
 - type: cron
   name: zoho-sync
   env: python
-  schedule: "0 */6 * * *"
+  schedule: "0 0 * * 0"  # Every Sunday at midnight
   buildCommand: "pip install -r requirements.txt"
   startCommand: "python sync_zoho_deals.py"
 ```

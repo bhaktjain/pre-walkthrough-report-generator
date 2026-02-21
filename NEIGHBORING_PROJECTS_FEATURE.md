@@ -10,10 +10,10 @@ The Neighboring Projects feature automatically adds a section to pre-walkthrough
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  1. Sync Script (runs every 6 hours)                        │
+│  1. Sync Script (runs every week)                           │
 │     ├─ Fetches all Deals from Zoho CRM                     │
 │     ├─ Stores in local cache (data/cache/zoho_deals_cache.json) │
-│     └─ Cache TTL: 6 hours                                   │
+│     └─ Cache TTL: 1 week (168 hours)                       │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
@@ -31,7 +31,7 @@ The Neighboring Projects feature automatically adds a section to pre-walkthrough
 ✅ **Fast**: No API calls during report generation (instant lookup)  
 ✅ **Reliable**: Works even if Zoho API is down  
 ✅ **Efficient**: One sync updates all data  
-✅ **Fresh**: Auto-refreshes every 6 hours  
+✅ **Fresh**: Auto-refreshes every week  
 ✅ **Smart**: Matches by building first, then neighborhood  
 
 ## Setup
@@ -80,15 +80,15 @@ python sync_zoho_deals.py
 # Edit crontab
 crontab -e
 
-# Add this line to run every 6 hours
-0 */6 * * * cd /path/to/project && python sync_zoho_deals.py >> sync.log 2>&1
+# Add this line to run every week (Sunday at midnight)
+0 0 * * 0 cd /path/to/project && python sync_zoho_deals.py >> sync.log 2>&1
 ```
 
 #### Option B: Windows Task Scheduler
 
 1. Open Task Scheduler
 2. Create Basic Task
-3. Trigger: Daily, repeat every 6 hours
+3. Trigger: Weekly, every Sunday at midnight
 4. Action: Start a program
 5. Program: `python`
 6. Arguments: `C:\path\to\project\sync_zoho_deals.py`
@@ -105,7 +105,7 @@ services:
   - type: cron
     name: zoho-sync
     env: python
-    schedule: "0 */6 * * *"  # Every 6 hours
+    schedule: "0 0 * * 0"  # Every Sunday at midnight
     buildCommand: "pip install -r requirements.txt"
     startCommand: "python sync_zoho_deals.py"
 ```
@@ -216,7 +216,8 @@ Projects are considered "same neighborhood" if:
 
 Edit `neighboring_projects.py`:
 ```python
-self.cache_ttl_hours = 12  # Change from 6 to 12 hours
+self.cache_ttl_hours = 168  # 1 week (default)
+# Change to 336 for 2 weeks, or 24 for 1 day
 ```
 
 ### Change Fields Fetched
