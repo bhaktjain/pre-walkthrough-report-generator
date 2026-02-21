@@ -23,30 +23,45 @@ class NeighboringProjectsManager:
         self.cache_file = self.cache_dir / "zoho_deals_cache.json"
         self.cache_ttl_hours = 168  # Refresh every 1 week (7 days * 24 hours)
         
-    def _extract_neighborhood_from_address(self, address: str) -> Optional[str]:
+    def _extract_street_info(self, address: str) -> Optional[Dict[str, Any]]:
         """
-        Extract neighborhood from address string
-        For NYC addresses, we'll use zip code or borough
+        Extract street information from NYC address
+        Returns dict with street_number, direction, street_name, street_type
         """
-        # Extract zip code
-        zip_match = re.search(r'\b(\d{5})\b', address)
-        if zip_match:
-            return zip_match.group(1)
-        
-        # Extract borough/neighborhood
-        nyc_neighborhoods = [
-            'Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island',
-            'Flatiron', 'Chelsea', 'Midtown', 'Upper East Side', 'Upper West Side',
-            'Lower East Side', 'SoHo', 'Tribeca', 'Greenwich Village', 'East Village',
-            'Williamsburg', 'Park Slope', 'DUMBO', 'Long Island City'
-        ]
-        
-        address_lower = address.lower()
-        for neighborhood in nyc_neighborhoods:
-            if neighborhood.lower() in address_lower:
-                return neighborhood
-        
+        # Pattern for NYC streets: "305 East 24th Street"
+        match = re.search(r'(\d+)\s+(East|West|E|W)\s+(\d+)(?:st|nd|rd|th)?\s*(Street|St|Avenue|Ave)?', 
+                         address, re.IGNORECASE)
+        if match:
+            return {
+                'street_number': int(match.group(1)),
+                'direction': match.group(2).lower(),
+                'street_name': int(match.group(3)),
+                'street_type': match.group(4) or 'Street'
+            }
         return None
+    
+    def _is_nearby_street(self, address1: str, address2: str, max_blocks: int = 5) -> bool:
+        """
+        Check if two NYC addresses are within max_blocks of each other
+        """
+        info1 = self._extract_street_info(address1)
+        info2 = self._extract_street_info(address2)
+        
+        if not info1 or not info2:
+            return False
+        
+        # Normalize directions
+        dir_map = {'e': 'east', 'w': 'west', 'n': 'north', 's': 'south'}
+        dir1 = dir_map.get(info1['direction'], info1['direction'])
+        dir2 = dir_map.get(info2['direction'], info2['direction'])
+        
+        # Must be on same side (East or West)
+        if dir1 != dir2:
+            return False
+        
+        # Check if within max_blocks
+        block_distance = abs(info1['street_name'] - info2['street_name'])
+        return block_distance <= max_blocks
     
     def _normalize_address(self, address: str) -> str:
         """Normalize address for comparison"""
@@ -99,16 +114,13 @@ class NeighboringProjectsManager:
     def _is_same_neighborhood(self, address1: str, address2: str, 
                              neighborhood1: str = None, neighborhood2: str = None) -> bool:
         """Check if two addresses are in the same neighborhood"""
-        # First try explicit neighborhoods
+        # For NYC addresses, use geographic proximity (within 5 blocks)
+        if self._is_nearby_street(address1, address2, max_blocks=5):
+            return True
+        
+        # Fallback: try explicit neighborhoods if provided
         if neighborhood1 and neighborhood2:
             return neighborhood1.lower() == neighborhood2.lower()
-        
-        # Extract neighborhoods from addresses
-        n1 = neighborhood1 or self._extract_neighborhood_from_address(address1)
-        n2 = neighborhood2 or self._extract_neighborhood_from_address(address2)
-        
-        if n1 and n2:
-            return n1.lower() == n2.lower()
         
         return False
     
