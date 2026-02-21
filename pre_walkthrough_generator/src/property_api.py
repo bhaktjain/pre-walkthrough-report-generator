@@ -441,79 +441,109 @@ class PropertyAPI:
             return None
         
         try:
-            # Remove unit numbers for better search results
+            # Remove unit numbers for base address
             # Handle patterns like: "#8C", "Apt 8C", ", #8C", ", Apt 8C"
             base_address = re.sub(r'\s*[,]?\s*[#]?\s*(apt|apartment|unit)\s*[a-zA-Z0-9/]+', '', address, flags=re.IGNORECASE)
             base_address = re.sub(r'\s*[,]?\s*#[a-zA-Z0-9/]+', '', base_address)
             base_address = base_address.strip().rstrip(',').strip()  # Clean up any trailing commas
             
-            # Search Google for the property on Realtor.com (use base_address without unit)
-            params = {
-                "engine": "google",
-                "q": f"{base_address} site:realtor.com/realestateandhomes-detail",
-                "num": "10",  # Get more results to increase chances of finding correct one
-                "api_key": self.serpapi_key,
-            }
+            # Extract unit number from original address for validation
+            unit_number = None
+            unit_match = re.search(r'(?:apt|apartment|unit|#)\s*([a-zA-Z0-9/]+)', address, re.IGNORECASE)
+            if unit_match:
+                unit_number = unit_match.group(1).upper()
+                logger.info(f"Extracted unit number for validation: {unit_number}")
             
-            logger.info(f"SerpAPI query: {params['q']}")
-            resp = requests.get("https://serpapi.com/search.json", params=params, timeout=15)
-            logger.info(f"SerpAPI status: {resp.status_code}")
+            # Strategy: Try searching WITH the full address including unit first
+            # This gives more precise results when the unit is listed
+            search_queries = [
+                f'"{address}" site:realtor.com/realestateandhomes-detail',  # Exact match with unit
+                f"{address} site:realtor.com/realestateandhomes-detail",    # With unit, no quotes
+                f"{base_address} site:realtor.com/realestateandhomes-detail"  # Without unit (fallback)
+            ]
             
-            if resp.status_code != 200:
-                logger.warning(f"SerpAPI returned status {resp.status_code}")
-                return None
+            for query in search_queries:
+                params = {
+                    "engine": "google",
+                    "q": query,
+                    "num": "10",  # Get more results to increase chances of finding correct one
+                    "api_key": self.serpapi_key,
+                }
+                
+                logger.info(f"SerpAPI query: {params['q']}")
+                resp = requests.get("https://serpapi.com/search.json", params=params, timeout=15)
+                logger.info(f"SerpAPI status: {resp.status_code}")
+                
+                if resp.status_code != 200:
+                    logger.warning(f"SerpAPI returned status {resp.status_code}")
+                    continue
+                
+                data = resp.json()
+                
+                # Extract street number from requested address for validation
+                addr_number_match = re.search(r'^(\d+)', base_address.strip())
+                requested_street_num = addr_number_match.group(1) if addr_number_match else None
+                
+                # Extract street name from requested address for validation
+                # e.g., "305 East 24th Street" -> "24"
+                requested_street_name = None
+                street_name_match = re.search(r'\d+\s+(?:east|west|north|south|e|w|n|s)\s+(\d+)(?:st|nd|rd|th)?', base_address, re.IGNORECASE)
+                if street_name_match:
+                    requested_street_name = street_name_match.group(1)  # e.g., "24"
+                
+                # Look through organic results for Realtor.com links
+                for result in data.get("organic_results", []):
+                    link = result.get("link", "")
+                    if 'realtor.com/realestateandhomes-detail' in link:
+                        logger.info(f"Found Realtor.com link: {link}")
+                        
+                        # Extract street number and name from URL for validation
+                        # URL format: .../305-E-24th-St-Apt-8C_New-York_...
+                        url_match = re.search(r'/(\d+)-(?:E|W|N|S|East|West|North|South)-(\d+)(?:st|nd|rd|th)?-', link, re.IGNORECASE)
+                        if url_match:
+                            url_street_num = url_match.group(1)  # e.g., "305"
+                            url_street_name = url_match.group(2)  # e.g., "24"
+                        else:
+                            # Fallback: just extract street number
+                            url_num_match = re.search(r'/(\d+)-', link)
+                            url_street_num = url_num_match.group(1) if url_num_match else None
+                            url_street_name = None
+                        
+                        # Validate street number matches
+                        if requested_street_num and url_street_num:
+                            if requested_street_num != url_street_num:
+                                logger.warning(f"SerpAPI result rejected - street number mismatch: {requested_street_num} vs {url_street_num}")
+                                logger.warning(f"Rejected URL: {link}")
+                                continue  # Try next result
+                        
+                        # Validate street name matches (if we have both)
+                        if requested_street_name and url_street_name:
+                            if requested_street_name != url_street_name:
+                                logger.warning(f"SerpAPI result rejected - street name mismatch: {requested_street_name} vs {url_street_name}")
+                                logger.warning(f"Rejected URL: {link}")
+                                continue  # Try next result
+                        
+                        # If we have a unit number, validate it matches the URL
+                        if unit_number:
+                            # Extract unit from URL: .../305-E-24th-St-Apt-8C_...
+                            url_unit_match = re.search(r'-(?:Apt|Apartment|Unit)-([a-zA-Z0-9]+)(?:_|$)', link, re.IGNORECASE)
+                            if url_unit_match:
+                                url_unit = url_unit_match.group(1).upper()
+                                if url_unit != unit_number:
+                                    logger.warning(f"SerpAPI result rejected - unit mismatch: requested {unit_number}, got {url_unit}")
+                                    logger.warning(f"Rejected URL: {link}")
+                                    continue  # Try next result
+                                else:
+                                    logger.info(f"✓ Unit number validated: {unit_number} == {url_unit}")
+                        
+                        prop_id = self.extract_property_id_from_url(link)
+                        if prop_id:
+                            logger.info(f"SerpAPI validated and returning property ID: {prop_id}")
+                            return prop_id
+                
+                logger.info(f"Query '{query}' found no valid property ID after validation")
             
-            data = resp.json()
-            
-            # Extract street number from requested address for validation
-            addr_number_match = re.search(r'^(\d+)', base_address.strip())
-            requested_street_num = addr_number_match.group(1) if addr_number_match else None
-            
-            # Extract street name from requested address for validation
-            # e.g., "305 East 24th Street" -> "24th" or "24"
-            requested_street_name = None
-            street_name_match = re.search(r'\d+\s+(?:east|west|north|south|e|w|n|s)\s+(\d+)(?:st|nd|rd|th)?', base_address, re.IGNORECASE)
-            if street_name_match:
-                requested_street_name = street_name_match.group(1)  # e.g., "24"
-            
-            # Look through organic results for Realtor.com links
-            for result in data.get("organic_results", []):
-                link = result.get("link", "")
-                if 'realtor.com/realestateandhomes-detail' in link:
-                    logger.info(f"Found Realtor.com link: {link}")
-                    
-                    # Extract street number and name from URL for validation
-                    # URL format: .../305-E-24th-St-Apt-8C_New-York_...
-                    url_match = re.search(r'/(\d+)-(?:E|W|N|S|East|West|North|South)-(\d+)(?:st|nd|rd|th)?-', link, re.IGNORECASE)
-                    if url_match:
-                        url_street_num = url_match.group(1)  # e.g., "305"
-                        url_street_name = url_match.group(2)  # e.g., "24"
-                    else:
-                        # Fallback: just extract street number
-                        url_num_match = re.search(r'/(\d+)-', link)
-                        url_street_num = url_num_match.group(1) if url_num_match else None
-                        url_street_name = None
-                    
-                    # Validate street number matches
-                    if requested_street_num and url_street_num:
-                        if requested_street_num != url_street_num:
-                            logger.warning(f"SerpAPI result rejected - street number mismatch: {requested_street_num} vs {url_street_num}")
-                            logger.warning(f"Rejected URL: {link}")
-                            continue  # Try next result
-                    
-                    # Validate street name matches (if we have both)
-                    if requested_street_name and url_street_name:
-                        if requested_street_name != url_street_name:
-                            logger.warning(f"SerpAPI result rejected - street name mismatch: {requested_street_name} vs {url_street_name}")
-                            logger.warning(f"Rejected URL: {link}")
-                            continue  # Try next result
-                    
-                    prop_id = self.extract_property_id_from_url(link)
-                    if prop_id:
-                        logger.info(f"SerpAPI validated and returning property ID: {prop_id}")
-                        return prop_id
-            
-            logger.info("No valid property ID found in SerpAPI results after validation")
+            logger.warning("All SerpAPI queries failed to find valid property ID")
             return None
             
         except Exception as e:
@@ -724,18 +754,25 @@ class PropertyAPI:
             import time
             
             # Extract key components for better matching
-            # Remove unit/apt for initial search to avoid confusion
+            # Remove unit/apt for base address
             # Handle patterns like: "#8C", "Apt 8C", ", #8C", ", Apt 8C"
             base_address = re.sub(r'\s*[,]?\s*[#]?\s*(apt|apartment|unit)\s*[a-zA-Z0-9/]+', '', address, flags=re.IGNORECASE)
             base_address = re.sub(r'\s*[,]?\s*#[a-zA-Z0-9/]+', '', base_address)
             base_address = base_address.strip().rstrip(',').strip()  # Clean up any trailing commas
             
+            # Extract unit number from original address for validation
+            unit_number = None
+            unit_match = re.search(r'(?:apt|apartment|unit|#)\s*([a-zA-Z0-9/]+)', address, re.IGNORECASE)
+            if unit_match:
+                unit_number = unit_match.group(1).upper()
+                logger.info(f"DuckDuckGo: Extracted unit number for validation: {unit_number}")
+            
             # Try multiple search variations with increasing specificity
             search_queries = [
-                f'"{base_address}" site:realtor.com/realestateandhomes-detail',  # Most specific first
-                f"{base_address} site:realtor.com/realestateandhomes-detail",
-                f'"{address}" site:realtor.com',
-                f"{address} realtor.com"
+                f'"{address}" site:realtor.com/realestateandhomes-detail',  # With unit, exact match
+                f"{address} site:realtor.com/realestateandhomes-detail",    # With unit
+                f'"{base_address}" site:realtor.com/realestateandhomes-detail',  # Without unit, exact
+                f"{base_address} site:realtor.com/realestateandhomes-detail",   # Without unit
             ]
             
             session = requests.Session()
@@ -805,7 +842,7 @@ class PropertyAPI:
                             clean_id = prop_id.replace('-', '')
                             if clean_id.isdigit() and len(clean_id) >= 8:
                                 # Extract street name from URL slug for validation
-                                # URL format: "305-E-24th-St_New-York_NY_10002"
+                                # URL format: "305-E-24th-St-Apt-8C_New-York_NY_10002"
                                 url_parts = url_slug.split('_')
                                 if url_parts:
                                     url_street = url_parts[0].replace('-', ' ').lower()
@@ -839,6 +876,18 @@ class PropertyAPI:
                                             logger.warning(f"DuckDuckGo: Property ID {clean_id} rejected - street name mismatch: {requested_street_name} vs {url_street_name}")
                                             continue
                                     
+                                    # If we have a unit number, validate it matches the URL
+                                    if unit_number:
+                                        # Extract unit from URL: .../305-E-24th-St-Apt-8C_...
+                                        url_unit_match = re.search(r'-(?:Apt|Apartment|Unit)-([a-zA-Z0-9]+)(?:_|$)', url_slug, re.IGNORECASE)
+                                        if url_unit_match:
+                                            url_unit = url_unit_match.group(1).upper()
+                                            if url_unit != unit_number:
+                                                logger.warning(f"DuckDuckGo: Property ID {clean_id} rejected - unit mismatch: requested {unit_number}, got {url_unit}")
+                                                continue  # Try next result
+                                            else:
+                                                logger.info(f"DuckDuckGo: ✓ Unit number validated: {unit_number} == {url_unit}")
+                                    
                                     # Additional validation: check if main street name components are present
                                     # For "20 Confucius Plaza" we want to match "confucius"
                                     addr_words = set(addr_street.split())
@@ -859,46 +908,7 @@ class PropertyAPI:
                         
                         logger.warning("DuckDuckGo: Found property IDs but none matched the address validation")
                     
-                    # Also try parsing with BeautifulSoup for structured results
-                    soup = BeautifulSoup(resp.text, "html.parser")
-                    
-                    # Look for various link selectors that DuckDuckGo might use
-                    selectors = [
-                        'a[href*="realtor.com"]',
-                        '.result a[href*="realtor.com"]',
-                        '.web-result a[href*="realtor.com"]',
-                        'a.result__a',
-                        '.links_main a[href*="realtor.com"]'
-                    ]
-                    
-                    realtor_urls_found = []
-                    for selector in selectors:
-                        links = soup.select(selector)
-                        for link in links:
-                            href = link.get('href', '')
-                            
-                            # Handle DuckDuckGo redirect URLs
-                            if '/l/?uddg=' in href:
-                                try:
-                                    real_url = urllib.parse.unquote(href.split('uddg=')[1].split('&')[0])
-                                except:
-                                    real_url = href
-                            else:
-                                real_url = href
-                            
-                            if real_url and 'realtor.com' in real_url and 'realestateandhomes-detail' in real_url:
-                                realtor_urls_found.append(real_url)
-                                logger.info(f"Found Realtor.com URL: {real_url}")
-                                
-                                # Extract property ID
-                                match = re.search(r'_M([\d-]+)', real_url)
-                                if match:
-                                    numeric = match.group(1).replace('-', '')
-                                    if numeric.isdigit() and len(numeric) >= 8:
-                                        logger.info(f"Extracted property ID from structured result: {numeric}")
-                                        return numeric
-                    
-                    logger.info(f"Query '{query}' found {len(realtor_urls_found)} realtor URLs but no valid property IDs")
+                    logger.info(f"Query '{query}' found no valid property IDs")
                     
                 except Exception as e:
                     logger.error(f"Error with query '{query}': {e}")
