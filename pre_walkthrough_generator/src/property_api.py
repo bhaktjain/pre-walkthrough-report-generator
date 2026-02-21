@@ -588,8 +588,9 @@ class PropertyAPI:
         ret_base = ret_base.strip().rstrip(',').strip()
         
         # Extract street number and name
-        req_match = re.match(r'(\d+)\s+([a-z\s]+?)(?:street|st|avenue|ave|road|rd|place|pl|plaza)(?:\s|,|$)', req_base)
-        ret_match = re.match(r'(\d+)\s+([a-z\s]+?)(?:street|st|avenue|ave|road|rd|place|pl|plaza)(?:\s|,|$)', ret_base)
+        # Use word boundary \b to avoid matching "st" inside "24th"
+        req_match = re.match(r'(\d+)\s+([a-z\s\d]+?)\b(?:street|st|avenue|ave|road|rd|place|pl|plaza|drive|dr|boulevard|blvd)\b', req_base)
+        ret_match = re.match(r'(\d+)\s+([a-z\s\d]+?)\b(?:street|st|avenue|ave|road|rd|place|pl|plaza|drive|dr|boulevard|blvd)\b', ret_base)
         
         if not req_match or not ret_match:
             logger.warning(f"Could not parse addresses for validation: '{req_base}' vs '{ret_base}'")
