@@ -286,23 +286,9 @@ class DocumentGenerator:
         last_sold_price = safe_get(property_info, 'last_sold_price')
         last_sold_date = safe_get(property_info, 'last_sold_date')
         
-        # Format last sold info
-        last_sold_display = 'Information not available'
-        if last_sold_price not in ('Information not available',) and last_sold_date not in ('Information not available',):
-            if isinstance(last_sold_price, (int, float)):
-                last_sold_display = f"${last_sold_price:,.0f} ({last_sold_date})"
-            else:
-                last_sold_display = f"{last_sold_price} ({last_sold_date})"
-        elif last_sold_price not in ('Information not available',):
-            if isinstance(last_sold_price, (int, float)):
-                last_sold_display = f"${last_sold_price:,.0f}"
-            else:
-                last_sold_display = str(last_sold_price)
-
         # Create the details table
         details = [
             ('Current Price', price_display),
-            ('Last Sold', last_sold_display),
             ('Square Footage', f"{sqft} sq ft"),
             ('Bedrooms', bedrooms),
             ('Bathrooms', bathrooms),

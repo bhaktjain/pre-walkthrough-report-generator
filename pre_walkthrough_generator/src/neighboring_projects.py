@@ -116,13 +116,20 @@ class NeighboringProjectsManager:
         deals = cache_data.get("deals", [])
 
         # Determine target neighborhood
-        # Use provided neighborhood, or look it up
-        if not target_neighborhood or target_neighborhood == 'Information not available':
-            try:
-                from nyc_neighborhoods import get_neighborhood_from_address
-                target_neighborhood = get_neighborhood_from_address(target_address, use_geocoding=False)
-            except ImportError:
-                pass
+        # Always do ZIP-based lookup for consistency with our cache
+        zip_neighborhood = None
+        try:
+            from nyc_neighborhoods import get_neighborhood_from_address
+            zip_neighborhood = get_neighborhood_from_address(target_address, use_geocoding=False)
+        except ImportError:
+            pass
+
+        # Use ZIP-based neighborhood as primary (matches our cache),
+        # fall back to provided neighborhood from API
+        if zip_neighborhood:
+            target_neighborhood = zip_neighborhood
+        elif not target_neighborhood or target_neighborhood == 'Information not available':
+            target_neighborhood = None
 
         if target_neighborhood:
             target_hood_lower = target_neighborhood.lower().strip()
