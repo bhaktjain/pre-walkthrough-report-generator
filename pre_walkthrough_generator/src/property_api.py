@@ -441,11 +441,15 @@ class PropertyAPI:
             return None
         
         try:
+            # Remove unit numbers for better search results
+            base_address = re.sub(r'\s*[#,]?\s*(apt|apartment|unit)\s*[a-zA-Z0-9/]+', '', address, flags=re.IGNORECASE)
+            base_address = re.sub(r'\s*#[a-zA-Z0-9/]+', '', base_address)
+            
             # Search Google for the property on Realtor.com
             params = {
                 "engine": "google",
                 "q": f"{address} site:realtor.com/realestateandhomes-detail",
-                "num": "5",
+                "num": "10",  # Get more results to increase chances of finding correct one
                 "api_key": self.serpapi_key,
             }
             
@@ -459,16 +463,34 @@ class PropertyAPI:
             
             data = resp.json()
             
+            # Extract street number from requested address for validation
+            addr_number_match = re.search(r'^(\d+)', base_address.strip())
+            requested_street_num = addr_number_match.group(1) if addr_number_match else None
+            
             # Look through organic results for Realtor.com links
             for result in data.get("organic_results", []):
                 link = result.get("link", "")
                 if 'realtor.com/realestateandhomes-detail' in link:
                     logger.info(f"Found Realtor.com link: {link}")
+                    
+                    # Extract street number from URL for validation
+                    # URL format: .../305-E-24th-St-Apt-8C_New-York_...
+                    url_match = re.search(r'/(\d+)-', link)
+                    url_street_num = url_match.group(1) if url_match else None
+                    
+                    # Validate street number matches
+                    if requested_street_num and url_street_num:
+                        if requested_street_num != url_street_num:
+                            logger.warning(f"SerpAPI result rejected - street number mismatch: {requested_street_num} vs {url_street_num}")
+                            logger.warning(f"Rejected URL: {link}")
+                            continue  # Try next result
+                    
                     prop_id = self.extract_property_id_from_url(link)
                     if prop_id:
+                        logger.info(f"SerpAPI validated and returning property ID: {prop_id}")
                         return prop_id
             
-            logger.info("No property ID found in SerpAPI results")
+            logger.info("No valid property ID found in SerpAPI results after validation")
             return None
             
         except Exception as e:
