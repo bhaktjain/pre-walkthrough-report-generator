@@ -694,9 +694,10 @@ class DocumentGenerator:
         self.doc.add_paragraph(intro)
         self.doc.add_paragraph()  # Spacing
         
-        # Create table
+        # Create table with same style as other tables
         table = self.doc.add_table(rows=1, cols=4)
-        table.style = 'Light Grid Accent 1'
+        table.style = 'Table Grid'  # Match other tables in the document
+        table.autofit = True
         
         # Header row
         header_cells = table.rows[0].cells
@@ -736,13 +737,6 @@ class DocumentGenerator:
                     cell._element.get_or_add_tcPr().append(shading_elm)
             else:
                 row_cells[3].text = "Neighborhood"
-        
-        # Add summary
-        self.doc.add_paragraph()
-        total_amount = sum(p.get('amount', 0) for p in neighboring_projects if p.get('amount'))
-        if total_amount > 0:
-            summary = f"Total project value in area: ${total_amount:,}"
-            self.doc.add_paragraph(summary)
 
     def generate_report(self, data: Dict[str, Any], output_dir: str = "data", file_name: str = None) -> Optional[str]:
         """Generate the pre-walkthrough report"""
