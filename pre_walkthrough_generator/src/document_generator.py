@@ -669,6 +669,80 @@ class DocumentGenerator:
         
         for note in notes:
             self.doc.add_paragraph(note)
+    
+    def _add_neighboring_projects(self, data: Dict[str, Any]):
+        """Add neighboring projects section from Zoho CRM"""
+        self.doc.add_heading('Neighboring Projects', level=1)
+        
+        neighboring_projects = data.get('neighboring_projects', [])
+        
+        if not neighboring_projects:
+            self.doc.add_paragraph("No neighboring projects found in this area.")
+            return
+        
+        # Add intro text
+        same_building = [p for p in neighboring_projects if p.get('is_same_building')]
+        if same_building:
+            intro = f"Found {len(same_building)} project(s) in the same building"
+            if len(neighboring_projects) > len(same_building):
+                intro += f" and {len(neighboring_projects) - len(same_building)} in the neighborhood."
+            else:
+                intro += "."
+        else:
+            intro = f"Found {len(neighboring_projects)} project(s) in the neighborhood."
+        
+        self.doc.add_paragraph(intro)
+        self.doc.add_paragraph()  # Spacing
+        
+        # Create table
+        table = self.doc.add_table(rows=1, cols=4)
+        table.style = 'Light Grid Accent 1'
+        
+        # Header row
+        header_cells = table.rows[0].cells
+        headers = ['Project Address', 'Amount', 'Stage', 'Location']
+        for i, header in enumerate(headers):
+            header_cells[i].text = header
+            # Make header bold
+            for paragraph in header_cells[i].paragraphs:
+                for run in paragraph.runs:
+                    run.font.bold = True
+        
+        # Add project rows
+        for project in neighboring_projects:
+            row_cells = table.add_row().cells
+            
+            # Project address/name
+            row_cells[0].text = project.get('deal_name', 'N/A')
+            
+            # Amount
+            amount = project.get('amount')
+            if amount and amount > 0:
+                row_cells[1].text = f"${amount:,}"
+            else:
+                row_cells[1].text = "TBD"
+            
+            # Stage/Status
+            stage = project.get('stage', 'Unknown')
+            row_cells[2].text = stage
+            
+            # Location indicator
+            if project.get('is_same_building'):
+                row_cells[3].text = "Same Building"
+                # Highlight same building projects
+                for cell in row_cells:
+                    shading_elm = OxmlElement('w:shd')
+                    shading_elm.set(qn('w:fill'), "E6F2FF")  # Light blue
+                    cell._element.get_or_add_tcPr().append(shading_elm)
+            else:
+                row_cells[3].text = "Neighborhood"
+        
+        # Add summary
+        self.doc.add_paragraph()
+        total_amount = sum(p.get('amount', 0) for p in neighboring_projects if p.get('amount'))
+        if total_amount > 0:
+            summary = f"Total project value in area: ${total_amount:,}"
+            self.doc.add_paragraph(summary)
 
     def generate_report(self, data: Dict[str, Any], output_dir: str = "data", file_name: str = None) -> Optional[str]:
         """Generate the pre-walkthrough report"""
@@ -703,6 +777,9 @@ class DocumentGenerator:
             self._add_section_break()
             
             self._add_budget_summary(data)  # Cost breakdown
+            self._add_section_break()
+            
+            self._add_neighboring_projects(data)  # Neighboring projects from Zoho CRM
             self._add_section_break()
             
             self._add_notes(data)  # Additional notes and requirements

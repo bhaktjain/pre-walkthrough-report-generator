@@ -22,6 +22,7 @@ try:
     import transcript_processor
     import property_api
     import document_generator
+    from neighboring_projects import NeighboringProjectsManager
 except ImportError as e:
     logging.error(f"Import error: {e}")
     raise
@@ -31,6 +32,7 @@ except Exception as e:
     import transcript_processor
     import property_api
     import document_generator
+    from neighboring_projects import NeighboringProjectsManager
 
 # Configure logging
 logging.basicConfig(
@@ -201,6 +203,28 @@ def process_transcript_and_generate_report(transcript_path: str, address: str = 
         
         logger.info(f"Property ID: {property_id}")
         logger.info(f"Realtor URL: {canonical_realtor_url}")
+        
+        # Fetch neighboring projects from Zoho CRM cache
+        logger.info("Looking up neighboring projects...")
+        neighboring_projects = []
+        try:
+            projects_manager = NeighboringProjectsManager()
+            
+            # Extract neighborhood from property details if available
+            neighborhood = property_details.get('neighborhood', 'Information not available')
+            if neighborhood and neighborhood != 'Information not available':
+                logger.info(f"Searching for projects in neighborhood: {neighborhood}")
+                neighboring_projects = projects_manager.find_neighboring_projects(
+                    target_address=address,
+                    target_neighborhood=neighborhood,
+                    same_building_only=False
+                )
+                logger.info(f"Found {len(neighboring_projects)} neighboring projects")
+            else:
+                logger.info("No neighborhood information available, skipping neighboring projects lookup")
+        except Exception as e:
+            logger.error(f"Error fetching neighboring projects: {e}")
+            # Continue without neighboring projects
 
         # Create final data dictionary
         final_data = {
@@ -210,7 +234,8 @@ def process_transcript_and_generate_report(transcript_path: str, address: str = 
             "property_details": property_details,
             "images": property_photos,
             "floor_plans": floor_plans,
-            "transcript_info": transcript_info
+            "transcript_info": transcript_info,
+            "neighboring_projects": neighboring_projects
         }
 
         # Generate report
