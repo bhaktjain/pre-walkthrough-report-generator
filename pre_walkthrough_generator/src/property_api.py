@@ -441,6 +441,9 @@ class PropertyAPI:
             return None
         
         try:
+            # Normalize the address for search: convert "#8C" to "Apt 8C" since Google strips #
+            search_address = re.sub(r'#\s*([a-zA-Z0-9/]+)', r'Apt \1', address)
+            
             # Remove unit numbers for base address
             # Handle patterns like: "#8C", "Apt 8C", ", #8C", ", Apt 8C"
             base_address = re.sub(r'\s*[,]?\s*[#]?\s*(apt|apartment|unit)\s*[a-zA-Z0-9/]+', '', address, flags=re.IGNORECASE)
@@ -454,13 +457,21 @@ class PropertyAPI:
                 unit_number = unit_match.group(1).upper()
                 logger.info(f"Extracted unit number for validation: {unit_number}")
             
-            # Strategy: Try searching WITH the full address including unit first
-            # This gives more precise results when the unit is listed
+            # Also build a URL-slug style query: "305-E-24th-St-Apt-8C"
+            slug_address = self._build_search_slug(address)
+            
+            # Build a shorter version of the address without city/state/zip for exact match
+            # "305 East 24th Street Apt 8C" works better than "305 East 24th Street Apt 8C, New York, NY 10010"
+            short_address = search_address.split(',')[0].strip()
+            
+            # Strategy: Try the most precise queries first
             search_queries = [
-                f'"{address}" site:realtor.com/realestateandhomes-detail',  # Exact match with unit
-                f"{address} site:realtor.com/realestateandhomes-detail",    # With unit, no quotes
-                f"{base_address} site:realtor.com/realestateandhomes-detail"  # Without unit (fallback)
+                f'"{short_address}" site:realtor.com/realestateandhomes-detail',    # Short exact match (best hit rate)
+                f"{slug_address} site:realtor.com" if slug_address else None,       # URL slug format
+                f"{search_address} site:realtor.com/realestateandhomes-detail",     # Full address, no quotes
+                f"{base_address} site:realtor.com/realestateandhomes-detail"        # Without unit (fallback)
             ]
+            search_queries = [q for q in search_queries if q]  # Remove None entries
             
             for query in search_queries:
                 params = {
@@ -535,6 +546,12 @@ class PropertyAPI:
                                     continue  # Try next result
                                 else:
                                     logger.info(f"✓ Unit number validated: {unit_number} == {url_unit}")
+                            else:
+                                # URL has no unit but we requested one - this is a building-level listing
+                                # Skip it; we want the unit-specific listing
+                                logger.warning(f"SerpAPI result skipped - URL has no unit but unit {unit_number} was requested")
+                                logger.warning(f"Skipped URL: {link}")
+                                continue
                         
                         prop_id = self.extract_property_id_from_url(link)
                         if prop_id:
@@ -754,11 +771,13 @@ class PropertyAPI:
             import time
             
             # Extract key components for better matching
+            # Normalize # to Apt for search (search engines strip #)
+            search_address = re.sub(r'#\s*([a-zA-Z0-9/]+)', r'Apt \1', address)
+            
             # Remove unit/apt for base address
-            # Handle patterns like: "#8C", "Apt 8C", ", #8C", ", Apt 8C"
             base_address = re.sub(r'\s*[,]?\s*[#]?\s*(apt|apartment|unit)\s*[a-zA-Z0-9/]+', '', address, flags=re.IGNORECASE)
             base_address = re.sub(r'\s*[,]?\s*#[a-zA-Z0-9/]+', '', base_address)
-            base_address = base_address.strip().rstrip(',').strip()  # Clean up any trailing commas
+            base_address = base_address.strip().rstrip(',').strip()
             
             # Extract unit number from original address for validation
             unit_number = None
@@ -767,12 +786,15 @@ class PropertyAPI:
                 unit_number = unit_match.group(1).upper()
                 logger.info(f"DuckDuckGo: Extracted unit number for validation: {unit_number}")
             
-            # Try multiple search variations with increasing specificity
+            # Build URL-slug style query for better matching
+            slug_query = self._build_search_slug(address) if hasattr(self, '_build_search_slug') else None
+            
+            # Try multiple search variations — use "Apt" not "#"
             search_queries = [
-                f'"{address}" site:realtor.com/realestateandhomes-detail',  # With unit, exact match
-                f"{address} site:realtor.com/realestateandhomes-detail",    # With unit
-                f'"{base_address}" site:realtor.com/realestateandhomes-detail',  # Without unit, exact
-                f"{base_address} site:realtor.com/realestateandhomes-detail",   # Without unit
+                f'"{search_address}" site:realtor.com/realestateandhomes-detail',  # Exact with "Apt 8C"
+                f"{search_address} site:realtor.com/realestateandhomes-detail",    # With Apt, no quotes
+                f'"{base_address}" site:realtor.com/realestateandhomes-detail',    # Without unit, exact
+                f"{base_address} site:realtor.com/realestateandhomes-detail",      # Without unit
             ]
             
             session = requests.Session()
@@ -961,6 +983,25 @@ class PropertyAPI:
         logger.info("No Realtor.com URL found for address.")
         return None
 
+    def _build_search_slug(self, address: str) -> Optional[str]:
+        """Build a Realtor.com URL-slug style search string from an address.
+        e.g. '305 East 24th Street #8C, New York, NY 10010' -> '305-E-24th-St-Apt-8C'
+        """
+        try:
+            parts = address.split(',')
+            street = parts[0].strip()
+            # Normalize # to Apt
+            street = re.sub(r'#\s*([a-zA-Z0-9/]+)', r'Apt \1', street)
+            # Abbreviate direction
+            for full, abbr in [('East', 'E'), ('West', 'W'), ('North', 'N'), ('South', 'S')]:
+                street = re.sub(rf'\b{full}\b', abbr, street, flags=re.IGNORECASE)
+            # Abbreviate suffix
+            for full, abbr in [('Street', 'St'), ('Avenue', 'Ave'), ('Place', 'Pl'), ('Road', 'Rd'), ('Boulevard', 'Blvd'), ('Drive', 'Dr')]:
+                street = re.sub(rf'\b{full}\b', abbr, street, flags=re.IGNORECASE)
+            return street.replace(' ', '-')
+        except Exception:
+            return None
+
     def _remove_unit_part(self, address: str) -> str:
         """Remove unit/apartment part from address for better matching."""
         # Remove common unit patterns
@@ -1018,7 +1059,9 @@ class PropertyAPI:
         try:
             headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
             tried = set()
-            variations = [address]
+            # Normalize # to Apt for search
+            normalized = re.sub(r'#\s*([a-zA-Z0-9/]+)', r'Apt \1', address)
+            variations = [normalized]
             # Try without unit/apt
             stripped = self._remove_unit_part(address)
             if stripped != address:
@@ -1068,9 +1111,11 @@ class PropertyAPI:
         if not self.serpapi_key:
             return None
         try:
+            # Normalize # to Apt for search (Google strips #)
+            search_address = re.sub(r'#\s*([a-zA-Z0-9/]+)', r'Apt \1', address)
             params = {
                 "engine": "google",
-                "q": f"{address} site:realtor.com/realestateandhomes-detail",
+                "q": f'"{search_address}" site:realtor.com/realestateandhomes-detail',
                 "num": "10",
                 "api_key": self.serpapi_key,
             }

@@ -22,119 +22,38 @@ class NeighboringProjectsManager:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.cache_file = self.cache_dir / "zoho_deals_cache.json"
         self.cache_ttl_hours = 168  # Refresh every 1 week (7 days * 24 hours)
-        
-    def _extract_street_info(self, address: str) -> Optional[Dict[str, Any]]:
-        """
-        Extract street information from NYC address
-        Returns dict with street_number, direction, street_name, street_type
-        """
-        # Pattern for NYC streets: "305 East 24th Street"
-        match = re.search(r'(\d+)\s+(East|West|E|W)\s+(\d+)(?:st|nd|rd|th)?\s*(Street|St|Avenue|Ave)?', 
-                         address, re.IGNORECASE)
-        if match:
-            return {
-                'street_number': int(match.group(1)),
-                'direction': match.group(2).lower(),
-                'street_name': int(match.group(3)),
-                'street_type': match.group(4) or 'Street'
-            }
-        return None
-    
-    def _is_nearby_street(self, address1: str, address2: str, max_blocks: int = 5) -> bool:
-        """
-        Check if two NYC addresses are within max_blocks of each other
-        """
-        info1 = self._extract_street_info(address1)
-        info2 = self._extract_street_info(address2)
-        
-        if not info1 or not info2:
-            return False
-        
-        # Normalize directions
-        dir_map = {'e': 'east', 'w': 'west', 'n': 'north', 's': 'south'}
-        dir1 = dir_map.get(info1['direction'], info1['direction'])
-        dir2 = dir_map.get(info2['direction'], info2['direction'])
-        
-        # Must be on same side (East or West)
-        if dir1 != dir2:
-            return False
-        
-        # Check if within max_blocks
-        block_distance = abs(info1['street_name'] - info2['street_name'])
-        return block_distance <= max_blocks
-    
+
     def _normalize_address(self, address: str) -> str:
         """Normalize address for comparison"""
         if not address:
             return ""
-        
-        # Convert to lowercase
         addr = address.lower().strip()
-        
         # Remove apartment/unit numbers
-        addr = re.sub(r'\s*[#,]?\s*(apt|apartment|unit)\s*[a-zA-Z0-9]+', '', addr, flags=re.IGNORECASE)
-        addr = re.sub(r'\s*#[a-zA-Z0-9]+', '', addr)
-        
+        addr = re.sub(r'\s*[,]?\s*[#]?\s*(apt\.?|apartment|unit)\s+[#]?\s*[a-zA-Z0-9/\-]+', '', addr, flags=re.IGNORECASE)
+        addr = re.sub(r'\s+unit\s+[a-zA-Z0-9/\-]+', '', addr, flags=re.IGNORECASE)
+        addr = re.sub(r'\s*[,]?\s*#[a-zA-Z0-9/\-]+', '', addr)
         # Normalize street abbreviations
         replacements = {
-            ' street': ' st',
-            ' avenue': ' ave',
-            ' road': ' rd',
-            ' boulevard': ' blvd',
-            ' place': ' pl',
-            ' west ': ' w ',
-            ' east ': ' e ',
-            ' north ': ' n ',
-            ' south ': ' s ',
+            ' street': ' st', ' avenue': ' ave', ' road': ' rd',
+            ' boulevard': ' blvd', ' place': ' pl',
+            ' west ': ' w ', ' east ': ' e ',
+            ' north ': ' n ', ' south ': ' s ',
         }
-        
         for old, new in replacements.items():
             addr = addr.replace(old, new)
-        
-        # Remove extra spaces
         addr = ' '.join(addr.split())
-        
         return addr
-    
+
     def _is_same_building(self, address1: str, address2: str) -> bool:
         """Check if two addresses are in the same building"""
         norm1 = self._normalize_address(address1)
         norm2 = self._normalize_address(address2)
-        
         if not norm1 or not norm2:
             return False
-        
-        # Extract street address (without unit)
-        # e.g., "16 w 21st st" from "16 w 21st st apt 5a"
         street1 = norm1.split(',')[0].strip()
         street2 = norm2.split(',')[0].strip()
-        
         return street1 == street2
-    
-    def _is_same_neighborhood(self, address1: str, address2: str, 
-                             neighborhood1: str = None, neighborhood2: str = None) -> bool:
-        """Check if two addresses are in the same neighborhood"""
-        # Strategy 1: For NYC addresses, use geographic proximity (within 5 blocks)
-        if self._is_nearby_street(address1, address2, max_blocks=5):
-            return True
-        
-        # Strategy 2: Use explicit neighborhood names if both provided
-        if neighborhood1 and neighborhood2:
-            # Normalize neighborhood names for comparison
-            norm1 = neighborhood1.lower().strip()
-            norm2 = neighborhood2.lower().strip()
-            
-            # Direct match
-            if norm1 == norm2:
-                return True
-            
-            # Handle common variations
-            # e.g., "Midtown Manhattan" vs "Midtown" vs "Manhattan"
-            if norm1 in norm2 or norm2 in norm1:
-                return True
-        
-        return False
-    
+
     def save_cache(self, deals: List[Dict[str, Any]]) -> None:
         """Save deals to cache file"""
         cache_data = {
@@ -142,141 +61,137 @@ class NeighboringProjectsManager:
             "deals": deals,
             "count": len(deals)
         }
-        
         try:
             with open(self.cache_file, 'w') as f:
                 json.dump(cache_data, f, indent=2)
             logger.info(f"Saved {len(deals)} deals to cache")
         except Exception as e:
             logger.error(f"Error saving cache: {e}")
-    
+
     def load_cache(self) -> Optional[Dict[str, Any]]:
         """Load deals from cache file"""
         if not self.cache_file.exists():
             logger.info("Cache file does not exist")
             return None
-        
         try:
             with open(self.cache_file, 'r') as f:
                 cache_data = json.load(f)
-            
-            # Check if cache is still valid
             timestamp = datetime.fromisoformat(cache_data["timestamp"])
             age = datetime.now() - timestamp
-            
             if age > timedelta(hours=self.cache_ttl_hours):
                 logger.info(f"Cache is stale (age: {age})")
                 return None
-            
             logger.info(f"Loaded {cache_data['count']} deals from cache (age: {age})")
             return cache_data
-            
         except Exception as e:
             logger.error(f"Error loading cache: {e}")
             return None
-    
+
     def is_cache_valid(self) -> bool:
         """Check if cache exists and is still valid"""
-        cache_data = self.load_cache()
-        return cache_data is not None
-    
-    def find_neighboring_projects(self, target_address: str, 
+        return self.load_cache() is not None
+
+    def find_neighboring_projects(self, target_address: str,
                                  target_neighborhood: str = None,
                                  same_building_only: bool = False) -> List[Dict[str, Any]]:
         """
-        Find neighboring projects from cache
+        Find neighboring projects from cache using NEIGHBORHOOD matching.
+        
+        Strategy:
+        1. Determine the target address's neighborhood
+        2. For each cached deal, check its stored Neighborhood field
+        3. Match deals that share the same neighborhood
+        4. Same-building matches are always included and flagged
         
         Args:
             target_address: Address to search around
-            target_neighborhood: Neighborhood name (optional)
+            target_neighborhood: Neighborhood name (from property details or computed)
             same_building_only: Only return projects in same building
-            
-        Returns:
-            List of neighboring project dictionaries with:
-            - deal_name: Project name
-            - address: Project address
-            - amount: Deal amount
-            - stage: Deal stage/status
-            - is_same_building: Boolean flag
         """
         cache_data = self.load_cache()
-        
         if not cache_data:
             logger.warning("No valid cache available")
             return []
-        
+
         deals = cache_data.get("deals", [])
+
+        # Determine target neighborhood
+        # Use provided neighborhood, or look it up
+        if not target_neighborhood or target_neighborhood == 'Information not available':
+            try:
+                from nyc_neighborhoods import get_neighborhood_from_address
+                target_neighborhood = get_neighborhood_from_address(target_address, use_geocoding=False)
+            except ImportError:
+                pass
+
+        if target_neighborhood:
+            target_hood_lower = target_neighborhood.lower().strip()
+            logger.info(f"Target neighborhood: {target_neighborhood}")
+        else:
+            target_hood_lower = None
+            logger.warning(f"Could not determine neighborhood for: {target_address}")
+
         neighboring = []
-        
         for deal in deals:
             deal_name = deal.get("Deal_Name", "")
-            
-            # Skip if no deal name (likely not a valid project)
             if not deal_name:
                 continue
-            
-            # Extract address from deal name (assuming format like "111 Glenview Road")
-            # You may need to adjust this based on your actual data format
+
             deal_address = deal_name
-            
-            # Get deal neighborhood if available (from enhanced cache)
             deal_neighborhood = deal.get("Neighborhood")
-            
-            # Check if same building
+
+            # Check same building
             is_same_bldg = self._is_same_building(target_address, deal_address)
-            
-            # Check if same neighborhood (using both geographic proximity and explicit neighborhood)
-            is_same_neigh = self._is_same_neighborhood(
-                target_address, deal_address,
-                target_neighborhood, deal_neighborhood
-            )
-            
+
+            # Check same neighborhood
+            is_same_hood = False
+            if target_hood_lower and deal_neighborhood:
+                deal_hood_lower = deal_neighborhood.lower().strip()
+                is_same_hood = (target_hood_lower == deal_hood_lower)
+
             # Apply filters
             if same_building_only and not is_same_bldg:
                 continue
-            
-            if not same_building_only and not is_same_neigh and not is_same_bldg:
+            if not same_building_only and not is_same_hood and not is_same_bldg:
                 continue
-            
-            # Format the project data
+
             project = {
                 "deal_name": deal_name,
                 "address": deal_address,
                 "amount": deal.get("Amount", 0),
                 "stage": deal.get("Stage", "Unknown"),
                 "is_same_building": is_same_bldg,
-                "neighborhood": deal_neighborhood,  # Include neighborhood in output
+                "neighborhood": deal_neighborhood,
                 "contact_name": deal.get("Contact_Name", {}).get("name", "") if isinstance(deal.get("Contact_Name"), dict) else "",
                 "closing_date": deal.get("Closing_Date", "")
             }
-            
             neighboring.append(project)
-        
-        # Sort by same building first, then by amount
-        neighboring.sort(key=lambda x: (not x["is_same_building"], -x.get("amount", 0)))
-        
-        logger.info(f"Found {len(neighboring)} neighboring projects for {target_address}")
+
+        # Sort: same building first, then by amount descending
+        neighboring.sort(key=lambda x: (not x["is_same_building"], -(x.get("amount") or 0)))
+
+        logger.info(f"Found {len(neighboring)} neighboring projects for {target_address} "
+                    f"(neighborhood: {target_neighborhood})")
         return neighboring
-    
+
     def get_cache_stats(self) -> Dict[str, Any]:
         """Get cache statistics"""
         cache_data = self.load_cache()
-        
         if not cache_data:
-            return {
-                "exists": False,
-                "valid": False,
-                "count": 0,
-                "age": None
-            }
-        
+            return {"exists": False, "valid": False, "count": 0, "age": None}
+
         timestamp = datetime.fromisoformat(cache_data["timestamp"])
         age = datetime.now() - timestamp
-        
+
+        # Count deals with neighborhoods
+        deals = cache_data.get("deals", [])
+        with_hood = sum(1 for d in deals if d.get("Neighborhood"))
+
         return {
             "exists": True,
             "valid": age <= timedelta(hours=self.cache_ttl_hours),
             "count": cache_data["count"],
+            "deals_with_neighborhood": with_hood,
             "age_hours": age.total_seconds() / 3600,
             "last_updated": timestamp.strftime("%Y-%m-%d %H:%M:%S")
         }

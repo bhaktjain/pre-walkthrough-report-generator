@@ -221,19 +221,24 @@ def process_transcript_and_generate_report(transcript_path: str, address: str = 
             projects_manager = NeighboringProjectsManager()
             
             # Extract neighborhood from property details if available
-            neighborhood = property_details.get('neighborhood', 'Information not available')
-            if neighborhood and neighborhood != 'Information not available':
-                logger.info(f"Searching for projects in neighborhood: {neighborhood}")
-                neighboring_projects = projects_manager.find_neighboring_projects(
-                    target_address=address,
-                    target_neighborhood=neighborhood,
-                    same_building_only=False
-                )
-                logger.info(f"Found {len(neighboring_projects)} neighboring projects")
-            else:
-                logger.info("No neighborhood information available, skipping neighboring projects lookup")
+            neighborhood = None
+            if property_details and isinstance(property_details, dict):
+                neighborhood = property_details.get('neighborhood', None)
+                if neighborhood == 'Information not available':
+                    neighborhood = None
+            
+            # Always try to find neighboring projects using address-based neighborhood lookup
+            logger.info(f"Searching for neighboring projects (neighborhood from API: {neighborhood})")
+            neighboring_projects = projects_manager.find_neighboring_projects(
+                target_address=address,
+                target_neighborhood=neighborhood,
+                same_building_only=False
+            )
+            logger.info(f"Found {len(neighboring_projects)} neighboring projects")
         except Exception as e:
             logger.error(f"Error fetching neighboring projects: {e}")
+            import traceback
+            traceback.print_exc()
             # Continue without neighboring projects
 
         # Create final data dictionary

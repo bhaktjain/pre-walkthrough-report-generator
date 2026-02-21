@@ -70,8 +70,9 @@ tmp/
 data/*.docx
 data/*.pdf
 
-# Zoho CRM cache (contains deal data)
+# Cache files (contain deal data and geocoding results)
 data/cache/zoho_deals_cache.json
+data/cache/geocode_cache.json
 
 # Config files with sensitive data
 config.json
