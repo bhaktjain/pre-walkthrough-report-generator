@@ -114,13 +114,24 @@ class NeighboringProjectsManager:
     def _is_same_neighborhood(self, address1: str, address2: str, 
                              neighborhood1: str = None, neighborhood2: str = None) -> bool:
         """Check if two addresses are in the same neighborhood"""
-        # For NYC addresses, use geographic proximity (within 5 blocks)
+        # Strategy 1: For NYC addresses, use geographic proximity (within 5 blocks)
         if self._is_nearby_street(address1, address2, max_blocks=5):
             return True
         
-        # Fallback: try explicit neighborhoods if provided
+        # Strategy 2: Use explicit neighborhood names if both provided
         if neighborhood1 and neighborhood2:
-            return neighborhood1.lower() == neighborhood2.lower()
+            # Normalize neighborhood names for comparison
+            norm1 = neighborhood1.lower().strip()
+            norm2 = neighborhood2.lower().strip()
+            
+            # Direct match
+            if norm1 == norm2:
+                return True
+            
+            # Handle common variations
+            # e.g., "Midtown Manhattan" vs "Midtown" vs "Manhattan"
+            if norm1 in norm2 or norm2 in norm1:
+                return True
         
         return False
     
@@ -208,13 +219,16 @@ class NeighboringProjectsManager:
             # You may need to adjust this based on your actual data format
             deal_address = deal_name
             
+            # Get deal neighborhood if available (from enhanced cache)
+            deal_neighborhood = deal.get("Neighborhood")
+            
             # Check if same building
             is_same_bldg = self._is_same_building(target_address, deal_address)
             
-            # Check if same neighborhood
+            # Check if same neighborhood (using both geographic proximity and explicit neighborhood)
             is_same_neigh = self._is_same_neighborhood(
                 target_address, deal_address,
-                target_neighborhood, None
+                target_neighborhood, deal_neighborhood
             )
             
             # Apply filters
@@ -231,6 +245,7 @@ class NeighboringProjectsManager:
                 "amount": deal.get("Amount", 0),
                 "stage": deal.get("Stage", "Unknown"),
                 "is_same_building": is_same_bldg,
+                "neighborhood": deal_neighborhood,  # Include neighborhood in output
                 "contact_name": deal.get("Contact_Name", {}).get("name", "") if isinstance(deal.get("Contact_Name"), dict) else "",
                 "closing_date": deal.get("Closing_Date", "")
             }
