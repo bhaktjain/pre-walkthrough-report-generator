@@ -442,8 +442,10 @@ class PropertyAPI:
         
         try:
             # Remove unit numbers for better search results
-            base_address = re.sub(r'\s*[#,]?\s*(apt|apartment|unit)\s*[a-zA-Z0-9/]+', '', address, flags=re.IGNORECASE)
-            base_address = re.sub(r'\s*#[a-zA-Z0-9/]+', '', base_address)
+            # Handle patterns like: "#8C", "Apt 8C", ", #8C", ", Apt 8C"
+            base_address = re.sub(r'\s*[,]?\s*[#]?\s*(apt|apartment|unit)\s*[a-zA-Z0-9/]+', '', address, flags=re.IGNORECASE)
+            base_address = re.sub(r'\s*[,]?\s*#[a-zA-Z0-9/]+', '', base_address)
+            base_address = base_address.strip().rstrip(',').strip()  # Clean up any trailing commas
             
             # Search Google for the property on Realtor.com (use base_address without unit)
             params = {
@@ -528,11 +530,15 @@ class PropertyAPI:
         ret_lower = returned_address.lower().strip()
         
         # Remove unit/apt info for comparison (including units with slashes like #10/11)
-        req_base = re.sub(r'\s*[#,]?\s*(apt|apartment|unit)\s*[a-zA-Z0-9/]+', '', req_lower, flags=re.IGNORECASE)
-        ret_base = re.sub(r'\s*[#,]?\s*(apt|apartment|unit)\s*[a-zA-Z0-9/]+', '', ret_lower, flags=re.IGNORECASE)
+        # Handle patterns like: "#8C", "Apt 8C", ", #8C", ", Apt 8C"
+        req_base = re.sub(r'\s*[,]?\s*[#]?\s*(apt|apartment|unit)\s*[a-zA-Z0-9/]+', '', req_lower, flags=re.IGNORECASE)
+        ret_base = re.sub(r'\s*[,]?\s*[#]?\s*(apt|apartment|unit)\s*[a-zA-Z0-9/]+', '', ret_lower, flags=re.IGNORECASE)
         # Also remove standalone # patterns like "#10/11" or "#8C"
-        req_base = re.sub(r'\s*#[a-zA-Z0-9/]+', '', req_base)
-        ret_base = re.sub(r'\s*#[a-zA-Z0-9/]+', '', ret_base)
+        req_base = re.sub(r'\s*[,]?\s*#[a-zA-Z0-9/]+', '', req_base)
+        ret_base = re.sub(r'\s*[,]?\s*#[a-zA-Z0-9/]+', '', ret_base)
+        # Clean up any trailing commas
+        req_base = req_base.strip().rstrip(',').strip()
+        ret_base = ret_base.strip().rstrip(',').strip()
         
         # Extract street number and name
         req_match = re.match(r'(\d+)\s+([a-z\s]+?)(?:street|st|avenue|ave|road|rd|place|pl|plaza)(?:\s|,|$)', req_base)
@@ -719,8 +725,10 @@ class PropertyAPI:
             
             # Extract key components for better matching
             # Remove unit/apt for initial search to avoid confusion
-            base_address = re.sub(r'\s*[#,]?\s*(apt|apartment|unit)\s*[a-zA-Z0-9]+', '', address, flags=re.IGNORECASE)
-            base_address = re.sub(r'\s*#[a-zA-Z0-9]+', '', base_address)
+            # Handle patterns like: "#8C", "Apt 8C", ", #8C", ", Apt 8C"
+            base_address = re.sub(r'\s*[,]?\s*[#]?\s*(apt|apartment|unit)\s*[a-zA-Z0-9/]+', '', address, flags=re.IGNORECASE)
+            base_address = re.sub(r'\s*[,]?\s*#[a-zA-Z0-9/]+', '', base_address)
+            base_address = base_address.strip().rstrip(',').strip()  # Clean up any trailing commas
             
             # Try multiple search variations with increasing specificity
             search_queries = [
