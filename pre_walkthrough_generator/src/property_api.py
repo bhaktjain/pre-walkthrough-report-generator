@@ -475,6 +475,59 @@ class PropertyAPI:
             logger.error(f"Error in SerpAPI lookup: {e}")
             return None
 
+    def _validate_address_match(self, requested_address: str, returned_address: str) -> bool:
+        """Validate that the returned property address matches the requested address"""
+        if not requested_address or not returned_address:
+            return False
+        
+        # Normalize addresses for comparison
+        req_lower = requested_address.lower().strip()
+        ret_lower = returned_address.lower().strip()
+        
+        # Remove unit/apt info for comparison (including units with slashes like #10/11)
+        req_base = re.sub(r'\s*[#,]?\s*(apt|apartment|unit)\s*[a-zA-Z0-9/]+', '', req_lower, flags=re.IGNORECASE)
+        ret_base = re.sub(r'\s*[#,]?\s*(apt|apartment|unit)\s*[a-zA-Z0-9/]+', '', ret_lower, flags=re.IGNORECASE)
+        # Also remove standalone # patterns like "#10/11" or "#8C"
+        req_base = re.sub(r'\s*#[a-zA-Z0-9/]+', '', req_base)
+        ret_base = re.sub(r'\s*#[a-zA-Z0-9/]+', '', ret_base)
+        
+        # Extract street number and name
+        req_match = re.match(r'(\d+)\s+([a-z\s]+?)(?:street|st|avenue|ave|road|rd|place|pl|plaza)(?:\s|,|$)', req_base)
+        ret_match = re.match(r'(\d+)\s+([a-z\s]+?)(?:street|st|avenue|ave|road|rd|place|pl|plaza)(?:\s|,|$)', ret_base)
+        
+        if not req_match or not ret_match:
+            logger.warning(f"Could not parse addresses for validation: '{req_base}' vs '{ret_base}'")
+            return False
+        
+        req_number = req_match.group(1)
+        req_street = req_match.group(2).strip()
+        ret_number = ret_match.group(1)
+        ret_street = ret_match.group(2).strip()
+        
+        # Street numbers must match exactly
+        if req_number != ret_number:
+            logger.warning(f"Street number mismatch: requested {req_number}, got {ret_number}")
+            return False
+        
+        # Street names must have significant overlap
+        req_words = set(req_street.split())
+        ret_words = set(ret_street.split())
+        
+        # Get significant words (length > 2, not common words)
+        common_words = {'east', 'west', 'north', 'south', 'e', 'w', 'n', 's', 'st', 'ave', 'rd', 'pl'}
+        req_significant = {w for w in req_words if len(w) > 2 and w not in common_words}
+        ret_significant = {w for w in ret_words if len(w) > 2 and w not in common_words}
+        
+        # Check for overlap
+        if req_significant and ret_significant:
+            overlap = req_significant & ret_significant
+            if not overlap:
+                logger.warning(f"Street name mismatch: requested '{req_street}' ({req_significant}), got '{ret_street}' ({ret_significant})")
+                return False
+        
+        logger.info(f"Address validation passed: '{requested_address}' matches '{returned_address}'")
+        return True
+
     def get_all_property_data(self, address: str) -> Dict[str, Any]:
         """Get all property data in one call with optimized URL handling"""
         result = {
@@ -494,6 +547,13 @@ class PropertyAPI:
             time.sleep(1)  # Rate limiting
             details = self.get_property_details(property_id)
             if details:
+                # CRITICAL: Validate that the returned property matches the requested address
+                returned_address = details.get('address', '')
+                if not self._validate_address_match(address, returned_address):
+                    logger.error(f"Address mismatch! Requested: '{address}', Got: '{returned_address}'")
+                    logger.error(f"Property ID {property_id} does not match the requested address. Discarding results.")
+                    return result  # Return empty result
+                
                 result["property_details"] = details
                 # Check if API response includes the URL
                 if details.get('listing_url'):
