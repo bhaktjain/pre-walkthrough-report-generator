@@ -14,7 +14,7 @@ pip install -r render_requirements.txt
 
 # Create necessary directories
 echo "Creating directories..."
-mkdir -p data
+mkdir -p data/cache
 mkdir -p templates
 
 # Copy template file if it exists

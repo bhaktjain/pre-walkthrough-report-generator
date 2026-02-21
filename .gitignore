@@ -70,8 +70,7 @@ tmp/
 data/*.docx
 data/*.pdf
 
-# Cache files (contain deal data and geocoding results)
-data/cache/zoho_deals_cache.json
+# Cache files (geocoding results)
 data/cache/geocode_cache.json
 
 # Config files with sensitive data

@@ -59,6 +59,42 @@ server_metrics = {
     "last_request": None
 }
 
+@app.on_event("startup")
+async def startup_sync_zoho_cache():
+    """On startup, try to refresh Zoho deals cache if stale and credentials are available."""
+    try:
+        manager = NeighboringProjectsManager()
+        stats = manager.get_cache_stats()
+        logger.info(f"Zoho cache stats on startup: {stats}")
+        
+        if stats.get('valid') and stats.get('count', 0) > 0:
+            logger.info(f"Zoho cache is valid ({stats['count']} deals, {stats.get('age_hours', 0):.1f}h old). Skipping sync.")
+            return
+        
+        # Cache is missing or stale — try to sync
+        zoho_client_id = os.environ.get("ZOHO_CLIENT_ID")
+        zoho_client_secret = os.environ.get("ZOHO_CLIENT_SECRET")
+        zoho_refresh_token = os.environ.get("ZOHO_REFRESH_TOKEN")
+        
+        if not all([zoho_client_id, zoho_client_secret, zoho_refresh_token]):
+            logger.warning("Zoho credentials not configured. Neighboring projects will use existing cache if available.")
+            return
+        
+        logger.info("Zoho cache is stale or missing. Syncing deals...")
+        from zoho_api import ZohoAPI
+        zoho = ZohoAPI(zoho_client_id, zoho_client_secret, zoho_refresh_token)
+        fields = ["Deal_Name", "Amount", "Stage", "Contact_Name", "Closing_Date"]
+        deals = zoho.get_all_records("Deals", fields=fields, max_records=5000)
+        
+        if deals:
+            manager.save_cache(deals)
+            logger.info(f"Zoho cache refreshed: {len(deals)} deals")
+        else:
+            logger.warning("No deals returned from Zoho API")
+    except Exception as e:
+        logger.error(f"Startup Zoho sync failed (non-fatal): {e}")
+
+
 @app.get("/health")
 async def health_check():
     """Comprehensive health check"""
