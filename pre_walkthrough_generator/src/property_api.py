@@ -757,6 +757,18 @@ class PropertyAPI:
                                     # Extract street name from address (first part before comma)
                                     addr_street = address_lower.split(',')[0].strip() if ',' in address_lower else address_lower
                                     
+                                    # Extract street numbers for validation
+                                    addr_number_match = re.search(r'^(\d+)', addr_street)
+                                    url_number_match = re.search(r'^(\d+)', url_street)
+                                    
+                                    # Street numbers must match
+                                    if addr_number_match and url_number_match:
+                                        addr_number = addr_number_match.group(1)
+                                        url_number = url_number_match.group(1)
+                                        if addr_number != url_number:
+                                            logger.warning(f"Property ID {clean_id} rejected - street number mismatch: {addr_number} vs {url_number}")
+                                            continue
+                                    
                                     # Simple validation: check if main street name components are present
                                     # For "20 Confucius Plaza" we want to match "confucius"
                                     addr_words = set(addr_street.split())

@@ -204,6 +204,16 @@ def process_transcript_and_generate_report(transcript_path: str, address: str = 
         logger.info(f"Property ID: {property_id}")
         logger.info(f"Realtor URL: {canonical_realtor_url}")
         
+        # Check if property details are missing (validation failed)
+        if not property_details or not property_details.get('address'):
+            logger.warning("⚠️  Property details are missing or validation failed!")
+            logger.warning(f"⚠️  Requested address: {address}")
+            logger.warning("⚠️  This could mean:")
+            logger.warning("   1. Property not found on Realtor.com")
+            logger.warning("   2. Property ID lookup returned wrong property (validation rejected it)")
+            logger.warning("   3. Property is off-market or recently delisted")
+            logger.warning("⚠️  Report will be generated with limited property information")
+        
         # Fetch neighboring projects from Zoho CRM cache
         logger.info("Looking up neighboring projects...")
         neighboring_projects = []
