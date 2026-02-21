@@ -26,7 +26,7 @@ ZIP_TO_NEIGHBORHOOD = {
 
     # Midtown South
     "10001": "Chelsea",
-    "10010": "Gramercy Park",
+    "10010": "Kips Bay",  # 10010 covers Kips Bay, Gramercy, Flatiron — default to Kips Bay
     "10011": "Chelsea",
     "10016": "Murray Hill",
     "10017": "Murray Hill",
@@ -943,9 +943,100 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Direct address → neighborhood mapping for addresses that are hard to parse
-# or don't follow standard patterns. Built from geocoding results.
-DIRECT_ADDRESS_NEIGHBORHOOD: Dict[str, str] = {}
+# Direct street-range → neighborhood mapping for Manhattan areas where ZIP is too coarse
+# This is checked BEFORE the ZIP-based lookup for more precise results
+MANHATTAN_STREET_NEIGHBORHOOD = {
+    # East Side numbered streets
+    ("east", 1, 8): "East Village",
+    ("east", 9, 13): "East Village",
+    ("east", 14, 20): "Gramercy Park",
+    ("east", 21, 27): "Kips Bay",       # Kips Bay starts around 23rd but 21-22 are borderline
+    ("east", 28, 34): "Kips Bay",
+    ("east", 35, 39): "Murray Hill",
+    ("east", 40, 49): "Midtown East",
+    ("east", 50, 59): "Midtown East",
+    ("east", 60, 69): "Upper East Side",
+    ("east", 70, 79): "Upper East Side",
+    ("east", 80, 89): "Upper East Side",
+    ("east", 90, 99): "Upper East Side",
+    ("east", 100, 125): "East Harlem",
+
+    # West Side numbered streets
+    ("west", 1, 8): "West Village",
+    ("west", 9, 13): "West Village",
+    ("west", 14, 20): "Chelsea",
+    ("west", 21, 30): "Chelsea",
+    ("west", 31, 39): "Chelsea",
+    ("west", 40, 49): "Midtown West",
+    ("west", 50, 59): "Midtown West",
+    ("west", 60, 69): "Upper West Side",
+    ("west", 70, 79): "Upper West Side",
+    ("west", 80, 89): "Upper West Side",
+    ("west", 90, 99): "Upper West Side",
+    ("west", 100, 110): "Upper West Side",
+    ("west", 111, 125): "Harlem",
+    ("west", 126, 145): "Harlem",
+    ("west", 146, 165): "Hamilton Heights",
+    ("west", 166, 190): "Washington Heights",
+    ("west", 191, 220): "Inwood",
+}
+
+# Named street → neighborhood for avenues that cross multiple neighborhoods
+NAMED_STREET_NEIGHBORHOOD = {
+    "gramercy park south": "Gramercy Park",
+    "gramercy park north": "Gramercy Park",
+    "gramercy park east": "Gramercy Park",
+    "gramercy park west": "Gramercy Park",
+    "irving place": "Gramercy Park",
+    "stuyvesant square": "Gramercy Park",
+    "5th avenue": {
+        (1, 100): "Greenwich Village",
+        (100, 250): "Flatiron",
+        (250, 500): "Midtown",
+        (500, 800): "Midtown",
+        (800, 1200): "Upper East Side",
+    },
+    "5th ave": {
+        (1, 100): "Greenwich Village",
+        (100, 250): "Flatiron",
+        (250, 500): "Midtown",
+        (500, 800): "Midtown",
+        (800, 1200): "Upper East Side",
+    },
+    "park avenue": {
+        (1, 200): "Murray Hill",
+        (200, 500): "Midtown East",
+        (500, 700): "Midtown East",
+        (700, 1200): "Upper East Side",
+    },
+    "park ave": {
+        (1, 200): "Murray Hill",
+        (200, 500): "Midtown East",
+        (500, 700): "Midtown East",
+        (700, 1200): "Upper East Side",
+    },
+    "broadway": {
+        (1, 100): "Financial District",
+        (100, 400): "Tribeca",
+        (400, 800): "SoHo",
+        (800, 1200): "Union Square",
+        (1200, 1600): "Flatiron",
+        (1600, 2000): "Midtown",
+        (2000, 2500): "Upper West Side",
+    },
+    "lexington avenue": {
+        (1, 200): "Kips Bay",
+        (200, 400): "Murray Hill",
+        (400, 600): "Midtown East",
+        (600, 1200): "Upper East Side",
+    },
+    "lexington ave": {
+        (1, 200): "Kips Bay",
+        (200, 400): "Murray Hill",
+        (400, 600): "Midtown East",
+        (600, 1200): "Upper East Side",
+    },
+}
 
 # Cache file for geocoded results
 _GEOCODE_CACHE_FILE = Path(__file__).parent.parent.parent / "data" / "cache" / "geocode_cache.json"
@@ -1046,8 +1137,10 @@ def get_zip_from_address(address: str) -> Optional[str]:
 
     # 1. Check for numbered Manhattan streets: "305 East 24th Street"
     # Also handle "305 E. 24th St", "510 E. 86th St."
+    # Only match if building number is plausible for Manhattan (< 800)
     m = re.search(r'(\d+)\s+(east|west|e\.?|w\.?)\s+(\d+)(?:st|nd|rd|th)?', addr_normalized, re.IGNORECASE)
     if m:
+        building_num = int(m.group(1))
         street_num = int(m.group(3))
         direction = m.group(2).lower().rstrip('.')
         if direction in ('e',):
@@ -1055,22 +1148,23 @@ def get_zip_from_address(address: str) -> Optional[str]:
         elif direction in ('w',):
             direction = 'west'
 
-        for (side, lo, hi), zipcode in MANHATTAN_STREET_TO_ZIP.items():
-            if side == direction and lo <= street_num <= hi:
-                return zipcode
-        # If street number > 125, could be upper Manhattan
-        if street_num > 125 and street_num <= 220:
-            if direction == 'east':
-                return "10029"  # East Harlem / upper
-            elif direction == 'west':
-                if street_num <= 145:
-                    return "10027"  # Harlem
-                elif street_num <= 165:
-                    return "10031"  # Hamilton Heights
-                elif street_num <= 190:
-                    return "10032"  # Washington Heights
-                else:
-                    return "10040"  # Washington Heights / Inwood
+        if building_num < 800:
+            for (side, lo, hi), zipcode in MANHATTAN_STREET_TO_ZIP.items():
+                if side == direction and lo <= street_num <= hi:
+                    return zipcode
+            # If street number > 125, could be upper Manhattan
+            if street_num > 125 and street_num <= 220:
+                if direction == 'east':
+                    return "10029"  # East Harlem / upper
+                elif direction == 'west':
+                    if street_num <= 145:
+                        return "10027"  # Harlem
+                    elif street_num <= 165:
+                        return "10031"  # Hamilton Heights
+                    elif street_num <= 190:
+                        return "10032"  # Washington Heights
+                    else:
+                        return "10040"  # Washington Heights / Inwood
 
     # 2. Check Brooklyn named streets first (before generic named streets)
     for street_name, zipcode in BROOKLYN_NAMED_STREETS.items():
@@ -1285,23 +1379,25 @@ def get_neighborhood_from_address(address: str, use_geocoding: bool = False) -> 
     Determine neighborhood from a street address.
     
     Strategy:
-    1. Try local ZIP lookup → neighborhood mapping
-    2. Check geocode cache for previously resolved addresses
-    3. If use_geocoding=True and not cached, call Nominatim API
-    
-    Args:
-        address: Street address string
-        use_geocoding: If True, will call Nominatim API for unresolved addresses
+    1. Try direct street-to-neighborhood mapping (most precise)
+    2. Try local ZIP lookup → neighborhood mapping
+    3. Check geocode cache for previously resolved addresses
+    4. If use_geocoding=True and not cached, call Nominatim API
     """
     if not address:
         return None
 
-    # Strategy 1: Local ZIP-based lookup
+    # Strategy 1: Direct street-to-neighborhood (bypasses ZIP for precision)
+    hood = _neighborhood_from_street(address)
+    if hood:
+        return hood
+
+    # Strategy 2: Local ZIP-based lookup
     zipcode = get_zip_from_address(address)
     if zipcode and zipcode in ZIP_TO_NEIGHBORHOOD:
         return ZIP_TO_NEIGHBORHOOD[zipcode]
 
-    # Strategy 2: Check geocode cache
+    # Strategy 3: Check geocode cache
     cache = _load_geocode_cache()
     cache_key = _clean_address(address)
     if cache_key in cache:
@@ -1310,12 +1406,74 @@ def get_neighborhood_from_address(address: str, use_geocoding: bool = False) -> 
             return _neighborhood_from_geocode(geo)
         return None
 
-    # Strategy 3: Live geocoding (only if explicitly requested)
+    # Strategy 4: Live geocoding (only if explicitly requested)
     if use_geocoding:
         geo = geocode_address(address)
         if geo:
             return _neighborhood_from_geocode(geo)
 
+    return None
+
+
+def _neighborhood_from_street(address: str) -> Optional[str]:
+    """Determine neighborhood directly from street address without going through ZIP."""
+    if not address:
+        return None
+    
+    addr = address.lower().strip()
+    addr_clean = _clean_address(addr)
+    
+    # Check named streets first (Gramercy Park South, Irving Place, 5th Ave, etc.)
+    for street_name, value in NAMED_STREET_NEIGHBORHOOD.items():
+        if isinstance(value, str):
+            # Simple string match
+            if street_name in addr_clean:
+                return value
+        elif isinstance(value, dict):
+            # Range-based match: need building number
+            pattern = r'(\d+)\s+' + re.escape(street_name)
+            m = re.search(pattern, addr_clean)
+            if m:
+                building_num = int(m.group(1))
+                for (lo, hi), neighborhood in value.items():
+                    if lo <= building_num < hi:
+                        return neighborhood
+                # Beyond our ranges, use last
+                if value:
+                    return list(value.values())[-1]
+            # Also try abbreviated form
+            for full, abbr in [('avenue', 'ave'), ('street', 'st')]:
+                if full in street_name:
+                    short = street_name.replace(full, abbr)
+                    pattern = r'(\d+)\s+' + re.escape(short)
+                    m = re.search(pattern, addr_clean)
+                    if m:
+                        building_num = int(m.group(1))
+                        for (lo, hi), neighborhood in value.items():
+                            if lo <= building_num < hi:
+                                return neighborhood
+                        if value:
+                            return list(value.values())[-1]
+    
+    # Check numbered Manhattan streets: "305 East 24th Street"
+    # Only match if building number is plausible for Manhattan (< 800)
+    # Higher building numbers (e.g. 2260 East 29th) are Brooklyn/other boroughs
+    m = re.search(r'(\d+)\s+(east|west|e\.?|w\.?)\s+(\d+)(?:st|nd|rd|th)?', addr_clean, re.IGNORECASE)
+    if m:
+        building_num = int(m.group(1))
+        street_num = int(m.group(3))
+        direction = m.group(2).lower().rstrip('.')
+        if direction in ('e',):
+            direction = 'east'
+        elif direction in ('w',):
+            direction = 'west'
+        
+        # Manhattan building numbers on numbered streets are typically < 800
+        if building_num < 800:
+            for (side, lo, hi), neighborhood in MANHATTAN_STREET_NEIGHBORHOOD.items():
+                if side == direction and lo <= street_num <= hi:
+                    return neighborhood
+    
     return None
 
 

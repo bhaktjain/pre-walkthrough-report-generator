@@ -695,13 +695,13 @@ class DocumentGenerator:
         self.doc.add_paragraph()  # Spacing
         
         # Create table with same style as other tables
-        table = self.doc.add_table(rows=1, cols=4)
+        table = self.doc.add_table(rows=1, cols=3)
         table.style = 'Table Grid'  # Match other tables in the document
         table.autofit = True
         
         # Header row
         header_cells = table.rows[0].cells
-        headers = ['Project Address', 'Amount', 'Stage', 'Location']
+        headers = ['Project Address', 'Amount', 'Stage']
         for i, header in enumerate(headers):
             header_cells[i].text = header
             # Make header bold
@@ -726,12 +726,6 @@ class DocumentGenerator:
             # Stage/Status
             stage = project.get('stage', 'Unknown')
             row_cells[2].text = stage
-            
-            # Location indicator
-            if project.get('is_same_building'):
-                row_cells[3].text = "Same Building"
-            else:
-                row_cells[3].text = "Neighborhood"
 
     def generate_report(self, data: Dict[str, Any], output_dir: str = "data", file_name: str = None) -> Optional[str]:
         """Generate the pre-walkthrough report"""
