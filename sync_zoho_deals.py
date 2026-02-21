@@ -26,10 +26,14 @@ logger = logging.getLogger(__name__)
 def sync_deals():
     """Fetch all deals from Zoho CRM and save to cache"""
     
-    # Zoho credentials (should be in environment variables in production)
-    client_id = os.getenv("ZOHO_CLIENT_ID", "1000.BTVCVLRAA929UPUKPQ4A0Y2XS3WK8M")
-    client_secret = os.getenv("ZOHO_CLIENT_SECRET", "4f9ff22d9bcb4b68bb60af7fefc05616974e355296")
-    refresh_token = os.getenv("ZOHO_REFRESH_TOKEN", "1000.3ff810c474ffec8f0521d0d86923c052.2d1d1c684c2e23ffbe9f8b024535cfee")
+    # Zoho credentials from environment variables
+    client_id = os.getenv("ZOHO_CLIENT_ID")
+    client_secret = os.getenv("ZOHO_CLIENT_SECRET")
+    refresh_token = os.getenv("ZOHO_REFRESH_TOKEN")
+    
+    if not all([client_id, client_secret, refresh_token]):
+        logger.error("Missing Zoho credentials. Please set ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, and ZOHO_REFRESH_TOKEN environment variables.")
+        return False
     
     try:
         # Initialize Zoho API

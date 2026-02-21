@@ -730,11 +730,6 @@ class DocumentGenerator:
             # Location indicator
             if project.get('is_same_building'):
                 row_cells[3].text = "Same Building"
-                # Highlight same building projects
-                for cell in row_cells:
-                    shading_elm = OxmlElement('w:shd')
-                    shading_elm.set(qn('w:fill'), "E6F2FF")  # Light blue
-                    cell._element.get_or_add_tcPr().append(shading_elm)
             else:
                 row_cells[3].text = "Neighborhood"
 

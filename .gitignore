@@ -70,6 +70,9 @@ tmp/
 data/*.docx
 data/*.pdf
 
+# Zoho CRM cache (contains deal data)
+data/cache/zoho_deals_cache.json
+
 # Config files with sensitive data
 config.json
 pre_walkthrough_generator/config.json

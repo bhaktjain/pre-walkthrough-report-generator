@@ -1,0 +1,22 @@
+{
+  "api_keys": {
+    "openai": "your-openai-api-key-here",
+    "rapidapi": "your-rapidapi-key-here",
+    "serpapi": "your-serpapi-key-here",
+    "zoho": {
+      "client_id": "your-zoho-client-id",
+      "client_secret": "your-zoho-client-secret",
+      "refresh_token": "your-zoho-refresh-token"
+    }
+  },
+  "settings": {
+    "max_file_size": 10485760,
+    "timeout": 300,
+    "enable_logging": true,
+    "log_level": "INFO",
+    "zoho_cache_ttl_hours": 168
+  },
+  "templates": {
+    "default_template": "Pre-walkthrough_template.docx"
+  }
+}

@@ -42,17 +42,19 @@ No additional dependencies needed - uses existing packages.
 
 ### 2. Configure Zoho Credentials
 
-Already configured in `config.json`:
-```json
-{
-  "api_keys": {
-    "zoho": {
-      "client_id": "1000.BTVCVLRAA929UPUKPQ4A0Y2XS3WK8M",
-      "client_secret": "4f9ff22d9bcb4b68bb60af7fefc05616974e355296",
-      "refresh_token": "1000.3ff810c474ffec8f0521d0d86923c052.2d1d1c684c2e23ffbe9f8b024535cfee"
-    }
-  }
-}
+Set environment variables with your Zoho credentials:
+
+```bash
+export ZOHO_CLIENT_ID="your-zoho-client-id"
+export ZOHO_CLIENT_SECRET="your-zoho-client-secret"
+export ZOHO_REFRESH_TOKEN="your-zoho-refresh-token"
+```
+
+Or add them to your `.env` file:
+```
+ZOHO_CLIENT_ID=your-zoho-client-id
+ZOHO_CLIENT_SECRET=your-zoho-client-secret
+ZOHO_REFRESH_TOKEN=your-zoho-refresh-token
 ```
 
 ### 3. Initial Sync
