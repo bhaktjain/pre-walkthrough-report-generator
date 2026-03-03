@@ -502,11 +502,44 @@ class PropertyAPI:
                 if street_name_match:
                     requested_street_name = street_name_match.group(1)  # e.g., "24"
                 
+                # Extract city from requested address for validation
+                requested_city = self._extract_city_from_address(base_address.lower())
+                
+                # Extract named street info from requested address
+                # For named streets like "32 Madison Avenue" or "100 Broadway"
+                requested_named_street = None
+                requested_street_type = None
+                named_street_match = re.search(
+                    r'(\d+)\s+(?:(?:east|west|north|south|e|w|n|s)\s+)?([a-zA-Z]+)\s+(street|st|avenue|ave|road|rd|place|pl|plaza|plz|drive|dr|boulevard|blvd|lane|ln|terrace|ter|court|ct|way|parkway|pkwy)',
+                    base_address, re.IGNORECASE
+                )
+                if named_street_match:
+                    candidate_name = named_street_match.group(2).lower()
+                    # Only set named street if it's not a number (e.g., "24th" -> skip, "Madison" -> keep)
+                    if not re.match(r'^\d+', candidate_name):
+                        requested_named_street = candidate_name
+                        requested_street_type = self._normalize_street_type(named_street_match.group(3))
+                        logger.info(f"Extracted named street: '{requested_named_street}', type: '{requested_street_type}'")
+                
                 # Look through organic results for Realtor.com links
                 for result in data.get("organic_results", []):
                     link = result.get("link", "")
                     if 'realtor.com/realestateandhomes-detail' in link:
                         logger.info(f"Found Realtor.com link: {link}")
+                        
+                        # --- City validation from URL slug ---
+                        # URL format: .../32-Madison-St_Cortland_NY_13045_M...
+                        url_parts_match = re.search(r'/realestateandhomes-detail/[^_]+_([^_]+)_([A-Z]{2})', link)
+                        if url_parts_match and requested_city:
+                            url_city = url_parts_match.group(1).replace('-', ' ').lower()
+                            # Normalize NYC names
+                            nyc_names = {'new york', 'new york city', 'manhattan', 'nyc'}
+                            req_city_norm = requested_city if requested_city not in nyc_names else 'new york'
+                            url_city_norm = url_city if url_city not in nyc_names else 'new york'
+                            if req_city_norm != url_city_norm:
+                                logger.warning(f"SerpAPI result rejected - city mismatch: requested '{requested_city}', got '{url_city}'")
+                                logger.warning(f"Rejected URL: {link}")
+                                continue
                         
                         # Extract street number and name from URL for validation
                         # URL format: .../305-E-24th-St-Apt-8C_New-York_...
@@ -533,6 +566,33 @@ class PropertyAPI:
                                 logger.warning(f"SerpAPI result rejected - street name mismatch: {requested_street_name} vs {url_street_name}")
                                 logger.warning(f"Rejected URL: {link}")
                                 continue  # Try next result
+                        
+                        # --- Named street + street type validation ---
+                        # For addresses like "32 Madison Avenue" vs "32 Madison Street"
+                        if requested_named_street:
+                            # Extract named street and type from URL slug
+                            # e.g., "32-Madison-St_Cortland_NY" or "32-Madison-Ave_New-York_NY"
+                            url_slug_part = link.split('/realestateandhomes-detail/')[-1].split('_')[0] if '/realestateandhomes-detail/' in link else ''
+                            url_slug_lower = url_slug_part.replace('-', ' ').lower()
+                            
+                            # Check if the named street is in the URL
+                            if requested_named_street not in url_slug_lower:
+                                logger.warning(f"SerpAPI result rejected - named street '{requested_named_street}' not found in URL slug '{url_slug_lower}'")
+                                logger.warning(f"Rejected URL: {link}")
+                                continue
+                            
+                            # Check street type from URL
+                            if requested_street_type:
+                                url_type_match = re.search(
+                                    r'(st|ave|rd|pl|plz|dr|blvd|ln|ter|ct|pkwy|street|avenue|road|place|plaza|drive|boulevard|lane|terrace|court|parkway|way)',
+                                    url_slug_lower, re.IGNORECASE
+                                )
+                                if url_type_match:
+                                    url_street_type = self._normalize_street_type(url_type_match.group(1))
+                                    if requested_street_type != url_street_type:
+                                        logger.warning(f"SerpAPI result rejected - street type mismatch: requested '{requested_street_type}', got '{url_street_type}'")
+                                        logger.warning(f"Rejected URL: {link}")
+                                        continue
                         
                         # If we have a unit number, validate it matches the URL
                         if unit_number:
@@ -567,8 +627,51 @@ class PropertyAPI:
             logger.error(f"Error in SerpAPI lookup: {e}")
             return None
 
+    def _normalize_street_type(self, street_type: str) -> str:
+        """Normalize street type to a canonical form for comparison."""
+        st = street_type.lower().strip().rstrip('.')
+        type_map = {
+            'street': 'street', 'st': 'street',
+            'avenue': 'avenue', 'ave': 'avenue', 'av': 'avenue',
+            'road': 'road', 'rd': 'road',
+            'place': 'place', 'pl': 'place',
+            'plaza': 'plaza', 'plz': 'plaza',
+            'drive': 'drive', 'dr': 'drive',
+            'boulevard': 'boulevard', 'blvd': 'boulevard',
+            'lane': 'lane', 'ln': 'lane',
+            'terrace': 'terrace', 'ter': 'terrace',
+            'court': 'court', 'ct': 'court',
+            'way': 'way',
+            'circle': 'circle', 'cir': 'circle',
+            'parkway': 'parkway', 'pkwy': 'parkway',
+        }
+        return type_map.get(st, st)
+
+    def _extract_city_from_address(self, address: str) -> Optional[str]:
+        """Extract city name from a full address string."""
+        parts = [p.strip() for p in address.split(',')]
+        if len(parts) >= 2:
+            # City is typically the second-to-last or second part
+            # "32 Madison Avenue, New York, NY 10001" -> "New York"
+            # "32 Madison St, Cortland, NY 13045" -> "Cortland"
+            for part in parts[1:]:
+                part = part.strip()
+                # Skip parts that look like state/zip (e.g., "NY 10001", "NY")
+                if re.match(r'^[A-Z]{2}\s*\d{0,5}$', part.strip()):
+                    continue
+                # This is likely the city
+                return part.lower().strip()
+        return None
+
     def _validate_address_match(self, requested_address: str, returned_address: str) -> bool:
-        """Validate that the returned property address matches the requested address"""
+        """Validate that the returned property address matches the requested address.
+        
+        Checks:
+        1. Street number must match exactly
+        2. Street name must have significant word overlap
+        3. Street type must match (Avenue vs Street vs Place etc.)
+        4. City must match (if both are available)
+        """
         if not requested_address or not returned_address:
             return False
         
@@ -576,44 +679,69 @@ class PropertyAPI:
         req_lower = requested_address.lower().strip()
         ret_lower = returned_address.lower().strip()
         
+        # --- City validation ---
+        # Extract city from the full requested address (before stripping to base)
+        req_city = self._extract_city_from_address(req_lower)
+        ret_city = self._extract_city_from_address(ret_lower)
+        
+        if req_city and ret_city:
+            # Normalize NYC borough names
+            nyc_names = {'new york', 'new york city', 'manhattan', 'nyc'}
+            req_city_norm = req_city if req_city not in nyc_names else 'new york'
+            ret_city_norm = ret_city if ret_city not in nyc_names else 'new york'
+            
+            if req_city_norm != ret_city_norm:
+                logger.warning(f"City mismatch: requested '{req_city}', got '{ret_city}'")
+                return False
+        
         # Remove unit/apt info for comparison (including units with slashes like #10/11)
-        # Handle patterns like: "#8C", "Apt 8C", ", #8C", ", Apt 8C"
         req_base = re.sub(r'\s*[,]?\s*[#]?\s*(apt|apartment|unit)\s*[a-zA-Z0-9/]+', '', req_lower, flags=re.IGNORECASE)
         ret_base = re.sub(r'\s*[,]?\s*[#]?\s*(apt|apartment|unit)\s*[a-zA-Z0-9/]+', '', ret_lower, flags=re.IGNORECASE)
-        # Also remove standalone # patterns like "#10/11" or "#8C"
         req_base = re.sub(r'\s*[,]?\s*#[a-zA-Z0-9/]+', '', req_base)
         ret_base = re.sub(r'\s*[,]?\s*#[a-zA-Z0-9/]+', '', ret_base)
-        # Clean up any trailing commas
         req_base = req_base.strip().rstrip(',').strip()
         ret_base = ret_base.strip().rstrip(',').strip()
         
-        # Extract street number and name
-        # Use word boundary \b to avoid matching "st" inside "24th"
-        req_match = re.match(r'(\d+)\s+([a-z\s\d]+?)\b(?:street|st|avenue|ave|road|rd|place|pl|plaza|drive|dr|boulevard|blvd)\b', req_base)
-        ret_match = re.match(r'(\d+)\s+([a-z\s\d]+?)\b(?:street|st|avenue|ave|road|rd|place|pl|plaza|drive|dr|boulevard|blvd)\b', ret_base)
+        # Extract street number, street name, and street type separately
+        street_type_pattern = r'(street|st|avenue|ave|av|road|rd|place|pl|plaza|plz|drive|dr|boulevard|blvd|lane|ln|terrace|ter|court|ct|way|circle|cir|parkway|pkwy)'
+        req_match = re.match(rf'(\d+)\s+(.+?)\s+{street_type_pattern}\b', req_base, re.IGNORECASE)
+        ret_match = re.match(rf'(\d+)\s+(.+?)\s+{street_type_pattern}\b', ret_base, re.IGNORECASE)
         
         if not req_match or not ret_match:
+            # If we can't parse the address format, check if the street numbers match at minimum
+            req_num = re.match(r'(\d+)', req_base)
+            ret_num = re.match(r'(\d+)', ret_base)
+            if req_num and ret_num and req_num.group(1) == ret_num.group(1):
+                logger.info(f"Address format not fully parseable but street numbers match: '{req_base}' vs '{ret_base}'")
+                return True
             logger.warning(f"Could not parse addresses for validation: '{req_base}' vs '{ret_base}'")
-            return False
+            return True  # Allow through rather than discarding valid data
         
         req_number = req_match.group(1)
         req_street = req_match.group(2).strip()
+        req_type = req_match.group(3).strip()
         ret_number = ret_match.group(1)
         ret_street = ret_match.group(2).strip()
+        ret_type = ret_match.group(3).strip()
         
         # Street numbers must match exactly
         if req_number != ret_number:
             logger.warning(f"Street number mismatch: requested {req_number}, got {ret_number}")
             return False
         
+        # Street type must match (Avenue != Street, Place != Plaza, etc.)
+        if self._normalize_street_type(req_type) != self._normalize_street_type(ret_type):
+            logger.warning(f"Street type mismatch: requested '{req_type}' ({self._normalize_street_type(req_type)}), got '{ret_type}' ({self._normalize_street_type(ret_type)})")
+            return False
+        
         # Street names must have significant overlap
         req_words = set(req_street.split())
         ret_words = set(ret_street.split())
         
-        # Get significant words (length > 2, not common words)
-        common_words = {'east', 'west', 'north', 'south', 'e', 'w', 'n', 's', 'st', 'ave', 'rd', 'pl'}
-        req_significant = {w for w in req_words if len(w) > 2 and w not in common_words}
-        ret_significant = {w for w in ret_words if len(w) > 2 and w not in common_words}
+        # Get significant words (not directional prefixes)
+        direction_words = {'east', 'west', 'north', 'south', 'e', 'w', 'n', 's'}
+        req_significant = {w for w in req_words if w not in direction_words}
+        ret_significant = {w for w in ret_words if w not in direction_words}
         
         # Check for overlap
         if req_significant and ret_significant:
@@ -860,6 +988,22 @@ class PropertyAPI:
                         if street_name_match:
                             requested_street_name = street_name_match.group(1)  # e.g., "24"
                         
+                        # Extract named street and type for non-numbered streets
+                        requested_named_street = None
+                        requested_street_type = None
+                        named_match = re.search(
+                            r'(\d+)\s+(?:(?:east|west|north|south|e|w|n|s)\s+)?([a-zA-Z]+)\s+(street|st|avenue|ave|av|road|rd|place|pl|plaza|plz|drive|dr|boulevard|blvd|lane|ln|terrace|ter|court|ct|way|parkway|pkwy)',
+                            base_address, re.IGNORECASE
+                        )
+                        if named_match:
+                            candidate = named_match.group(2).lower()
+                            if not re.match(r'^\d+', candidate):
+                                requested_named_street = candidate
+                                requested_street_type = self._normalize_street_type(named_match.group(3))
+                        
+                        # Extract city from requested address
+                        requested_city = self._extract_city_from_address(base_address.lower())
+                        
                         # Validate each match against the original address
                         for url_slug, prop_id in matches:
                             clean_id = prop_id.replace('-', '')
@@ -887,6 +1031,16 @@ class PropertyAPI:
                                             logger.warning(f"DuckDuckGo: Property ID {clean_id} rejected - street number mismatch: {addr_number} vs {url_number}")
                                             continue
                                     
+                                    # --- City validation from URL slug ---
+                                    if requested_city and len(url_parts) >= 2:
+                                        url_city = url_parts[1].replace('-', ' ').lower()
+                                        nyc_names = {'new york', 'new york city', 'manhattan', 'nyc'}
+                                        req_city_norm = requested_city if requested_city not in nyc_names else 'new york'
+                                        url_city_norm = url_city if url_city not in nyc_names else 'new york'
+                                        if req_city_norm != url_city_norm:
+                                            logger.warning(f"DuckDuckGo: Property ID {clean_id} rejected - city mismatch: requested '{requested_city}', got '{url_city}'")
+                                            continue
+                                    
                                     # Extract and validate street name (e.g., "24" from "24th")
                                     url_street_name = None
                                     url_street_name_match = re.search(r'(?:e|w|n|s|east|west|north|south)\s+(\d+)(?:st|nd|rd|th)?', url_street, re.IGNORECASE)
@@ -898,6 +1052,23 @@ class PropertyAPI:
                                         if requested_street_name != url_street_name:
                                             logger.warning(f"DuckDuckGo: Property ID {clean_id} rejected - street name mismatch: {requested_street_name} vs {url_street_name}")
                                             continue
+                                    
+                                    # --- Named street + street type validation ---
+                                    if requested_named_street:
+                                        url_slug_lower = url_street
+                                        if requested_named_street not in url_slug_lower:
+                                            logger.warning(f"DuckDuckGo: Property ID {clean_id} rejected - named street '{requested_named_street}' not in URL '{url_slug_lower}'")
+                                            continue
+                                        if requested_street_type:
+                                            url_type_match = re.search(
+                                                r'\b(st|ave|rd|pl|plz|dr|blvd|ln|ter|ct|pkwy|street|avenue|road|place|plaza|drive|boulevard|lane|terrace|court|parkway|way)\b',
+                                                url_slug_lower, re.IGNORECASE
+                                            )
+                                            if url_type_match:
+                                                url_st_type = self._normalize_street_type(url_type_match.group(1))
+                                                if requested_street_type != url_st_type:
+                                                    logger.warning(f"DuckDuckGo: Property ID {clean_id} rejected - street type mismatch: '{requested_street_type}' vs '{url_st_type}'")
+                                                    continue
                                     
                                     # If we have a unit number, validate it matches the URL
                                     if unit_number:
@@ -912,16 +1083,20 @@ class PropertyAPI:
                                                 logger.info(f"DuckDuckGo: ✓ Unit number validated: {unit_number} == {url_unit}")
                                     
                                     # Additional validation: check if main street name components are present
-                                    # For "20 Confucius Plaza" we want to match "confucius"
                                     addr_words = set(addr_street.split())
                                     url_words = set(url_street.split())
                                     
-                                    # Find significant words (not numbers, not common words)
-                                    significant_addr_words = {w for w in addr_words if len(w) > 3 and not w.isdigit()}
-                                    significant_url_words = {w for w in url_words if len(w) > 3 and not w.isdigit()}
+                                    # Find significant words (not numbers, not common words, not directions)
+                                    skip_words = {'east', 'west', 'north', 'south', 'e', 'w', 'n', 's',
+                                                  'st', 'ave', 'rd', 'pl', 'dr', 'blvd', 'ln', 'ct',
+                                                  'street', 'avenue', 'road', 'place', 'drive', 'boulevard'}
+                                    significant_addr_words = {w for w in addr_words if len(w) > 2 and not w.isdigit() and w not in skip_words}
+                                    significant_url_words = {w for w in url_words if len(w) > 2 and not w.isdigit() and w not in skip_words}
                                     
                                     # Check if at least one significant word matches (or if we already validated street name)
-                                    if (requested_street_name and url_street_name and requested_street_name == url_street_name) or (significant_addr_words & significant_url_words):
+                                    if (requested_street_name and url_street_name and requested_street_name == url_street_name) or \
+                                       (requested_named_street and requested_named_street in url_slug_lower) or \
+                                       (significant_addr_words & significant_url_words):
                                         logger.info(f"DuckDuckGo: Validated property ID {clean_id} - address match confirmed")
                                         logger.info(f"URL slug: {url_slug}")
                                         return clean_id

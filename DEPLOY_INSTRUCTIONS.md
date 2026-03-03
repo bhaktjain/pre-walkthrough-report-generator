@@ -14,7 +14,7 @@ SerpAPI is working perfectly!
 4. Click **"Add Environment Variable"**
 5. Add:
    - **Key**: `SERPAPI_KEY`
-   - **Value**: `ee2110de0070e599bb574e3994c41acb8652362e1132bb0b8f5ec6d0ba529c16`
+   - **Value**: `<your-serpapi-key>`
 6. Click **"Save Changes"**
 
 ## Step 2: Deploy the Code

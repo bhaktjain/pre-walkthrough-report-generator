@@ -561,7 +561,10 @@ NAMED_STREET_TO_ZIP = {
     "front street": {(1, 999): "10004"},
     "south street": {(1, 999): "10004"},
     "whitehall street": {(1, 999): "10004"},
-    "state street": {(1, 999): "10004"},
+    "state street": {
+        (1, 50): "10004",        # State St → Financial District (Manhattan, very short)
+        (50, 999): "11217",      # State St → Boerum Hill (Brooklyn)
+    },
     "confucius plaza": {(1, 999): "10002"},
     "east end avenue": {
         (1, 999): "10028",       # East End Ave → Upper East Side
@@ -581,6 +584,7 @@ NAMED_STREET_TO_ZIP = {
     "fdr drive": {(1, 999): "10002"},
     "fdr dr": {(1, 999): "10002"},
     "rector place": {(1, 999): "10280"},
+    "battery park place": {(1, 999): "10280"},  # Battery Park City
     "south end avenue": {(1, 999): "10280"},
     "river terrace": {(1, 999): "10282"},
     "north end avenue": {(1, 999): "10282"},
@@ -744,7 +748,6 @@ NAMED_STREET_TO_ZIP = {
     "grace court": {(1, 999): "11201"},
     "garden place": {(1, 999): "11201"},
     "sidney place": {(1, 999): "11201"},
-    "state street": {(1, 999): "10004"},
     "pacific avenue": {(1, 999): "11217"},
     "macdonough street": {(1, 999): "11216"},
     "herkimer street": {(1, 999): "11216"},
@@ -1086,6 +1089,83 @@ def _clean_address(address: str) -> str:
     return addr.lower()
 
 
+def _is_miami_address(addr_lower: str) -> bool:
+    """Detect Miami/South Florida style addresses with NE/NW/SW/SE directions.
+    
+    Miami addresses follow the pattern: NUMBER + DIRECTION + STREET
+    e.g. "1321 NE 103rd St", "3145 SW 23rd St", "350 Northeast 24th Street"
+    
+    Must NOT match NYC streets that happen to contain direction words:
+    - "14 Prospect Park Southwest" (Brooklyn street name)
+    - "920 Northeast 16th Terrace" IS Miami (direction before street number)
+    """
+    # Pattern: building_number + direction + street_number/name
+    # The direction must come RIGHT AFTER the building number (Miami style)
+    # "1321 NE 103rd" = Miami, "14 Prospect Park Southwest" = NOT Miami
+    return bool(re.search(
+        r'^\d+\s+(?:ne|nw|sw|se|northeast|northwest|southwest|southeast)\s+',
+        addr_lower.strip(), re.IGNORECASE
+    ))
+
+
+def _is_queens_hyphenated(addr_lower: str) -> bool:
+    """Detect Queens-style hyphenated addresses like '35-15 84th Street'."""
+    return bool(re.match(r'^\d+-\d+\s+', addr_lower.strip()))
+
+
+def _get_miami_zip(address: str) -> Optional[str]:
+    """Try to determine ZIP for a Miami/FL address from our mapping or geocode cache."""
+    # Check if ZIP is already in the address
+    z = re.search(r'\b(\d{5})\b', address)
+    if z and z.group(1) in ZIP_TO_NEIGHBORHOOD:
+        return z.group(1)
+    # Check geocode cache
+    cache = _load_geocode_cache()
+    cache_key = _clean_address(address)
+    if cache_key in cache and cache[cache_key]:
+        pc = cache[cache_key].get('postcode')
+        if pc:
+            return pc
+    return None
+
+
+def _get_queens_zip(address: str) -> Optional[str]:
+    """Determine ZIP for Queens hyphenated addresses."""
+    addr = address.lower().strip()
+    # Extract the street part: "35-15 84th Street" → street_num = 84
+    m = re.match(r'\d+-\d+\s+(\d+)(?:st|nd|rd|th)?\s*(?:street|st|avenue|ave|road|rd)?', addr)
+    if m:
+        street_num = int(m.group(1))
+        # Queens street/avenue ranges to ZIP
+        if 20 <= street_num <= 30:
+            return "11101"  # Long Island City / Astoria area
+        elif 31 <= street_num <= 40:
+            return "11103"  # Astoria
+        elif 41 <= street_num <= 50:
+            return "11104"  # Sunnyside / Woodside
+        elif 60 <= street_num <= 70:
+            return "11374"  # Rego Park / Forest Hills area
+        elif 71 <= street_num <= 80:
+            return "11372"  # Jackson Heights
+        elif 81 <= street_num <= 90:
+            return "11373"  # Elmhurst
+    # Check for "Park Lane South" etc.
+    if 'park lane' in addr:
+        return "11374"  # Kew Gardens / Forest Hills
+    # Check if ZIP is in the address
+    z = re.search(r'\b(\d{5})\b', address)
+    if z and z.group(1) in ZIP_TO_NEIGHBORHOOD:
+        return z.group(1)
+    # Check geocode cache
+    cache = _load_geocode_cache()
+    cache_key = _clean_address(address)
+    if cache_key in cache and cache[cache_key]:
+        pc = cache[cache_key].get('postcode')
+        if pc:
+            return pc
+    return None
+
+
 def get_zip_from_address(address: str) -> Optional[str]:
     """
     Determine ZIP code from a street address using our mapping tables.
@@ -1098,11 +1178,51 @@ def get_zip_from_address(address: str) -> Optional[str]:
     addr_clean = _clean_address(addr)
 
     # 0. Check if address already contains a ZIP code
+    # Only match ZIP codes that are NOT at the very start of the address
+    # (a 5-digit number at the start is likely a building number, e.g. "10009 SW 127th St")
     zip_match = re.search(r'\b(\d{5})\b', address)
     if zip_match:
         z = zip_match.group(1)
         if z in ZIP_TO_NEIGHBORHOOD:
-            return z
+            # Make sure this isn't a building number at the start
+            if zip_match.start() > 0 or not re.match(r'^\d{5}\s+\w', address):
+                return z
+            # If it IS at the start, check if the rest looks like a Miami address
+            rest = address[zip_match.end():].strip()
+            if not re.match(r'(?:ne|nw|sw|se|northeast|northwest|southwest|southeast)\b', rest, re.IGNORECASE):
+                return z
+
+    # 0a. Early detection: Miami/FL addresses (NE/NW/SW/SE directions)
+    # Must come before any NYC street matching to avoid false positives
+    if _is_miami_address(addr):
+        result = _get_miami_zip(address)
+        if result:
+            return result
+        return None  # Don't fall through to NYC patterns
+
+    # 0b. Early detection: Queens hyphenated addresses (35-15, 43-19, etc.)
+    if _is_queens_hyphenated(addr):
+        result = _get_queens_zip(address)
+        if result:
+            return result
+        return None  # Don't fall through to Brooklyn patterns
+
+    # 0c. Early detection: Florida addresses by keyword (Bay Harbor, Beach View, etc.)
+    fl_keywords = ['bay harbor', 'beach view', 'indian creek', 'quayside',
+                   'belle meade', 'little river', 'bayshore', 'biscayne',
+                   'brickell', 'ocean drive', 'south ocean']
+    if any(kw in addr for kw in fl_keywords):
+        # Check geocode cache or ZIP in address
+        z = re.search(r'\b(\d{5})\b', address)
+        if z and z.group(1) in ZIP_TO_NEIGHBORHOOD:
+            return z.group(1)
+        cache = _load_geocode_cache()
+        cache_key = _clean_address(address)
+        if cache_key in cache and cache[cache_key]:
+            pc = cache[cache_key].get('postcode')
+            if pc:
+                return pc
+        return None  # Don't fall through to NYC patterns
 
     # 0b. Normalize common variations in the cleaned address
     # "Fifth" → "5th", "Second" → "2nd", etc.
@@ -1169,14 +1289,29 @@ def get_zip_from_address(address: str) -> Optional[str]:
     # 2. Check Brooklyn named streets first (before generic named streets)
     for street_name, zipcode in BROOKLYN_NAMED_STREETS.items():
         if street_name in addr_normalized:
+            # Guard: "battery park place" contains "park place" but is NOT Brooklyn
+            if street_name == "park place" and "battery park" in addr_normalized:
+                continue
             return zipcode
-        # Also try abbreviated form: "dean street" → "dean st"
+        # Also try abbreviated forms
         if street_name.endswith(' street'):
             short = street_name.replace(' street', ' st')
             if short in addr_normalized:
                 return zipcode
         elif street_name.endswith(' avenue'):
             short = street_name.replace(' avenue', ' ave')
+            if short in addr_normalized:
+                return zipcode
+        elif street_name.endswith(' parkway'):
+            short = street_name.replace(' parkway', ' pkwy')
+            if short in addr_normalized:
+                return zipcode
+        elif street_name.endswith(' boulevard'):
+            short = street_name.replace(' boulevard', ' blvd')
+            if short in addr_normalized:
+                return zipcode
+        elif street_name.endswith(' drive'):
+            short = street_name.replace(' drive', ' dr')
             if short in addr_normalized:
                 return zipcode
         elif street_name.endswith(' place'):
@@ -1239,9 +1374,12 @@ def get_zip_from_address(address: str) -> Optional[str]:
                 return zipcode
 
     # 6. Check for "North Xth Street" or "N Xth St" pattern (Williamsburg)
+    # Only match if building number is plausible for Williamsburg (< 500)
     m5 = re.search(r'(\d+)\s+(?:north|n\.?)\s+(\d+)(?:st|nd|rd|th)', addr_normalized, re.IGNORECASE)
     if m5:
-        return "11211"  # Williamsburg
+        building_num = int(m5.group(1))
+        if building_num < 500:
+            return "11211"  # Williamsburg
 
     # 7. Numbered streets without direction (could be Bronx: "301 174th St")
     m6 = re.search(r'(\d+)\s+(\d+)(?:st|nd|rd|th)\s*(?:street|st)?$', addr_normalized)
@@ -1422,6 +1560,21 @@ def _neighborhood_from_street(address: str) -> Optional[str]:
     
     addr = address.lower().strip()
     addr_clean = _clean_address(addr)
+    
+    # Early exit: Miami/FL addresses should NOT match Manhattan/Brooklyn patterns
+    if _is_miami_address(addr):
+        return None
+    
+    # Early exit: Queens hyphenated addresses should NOT match Brooklyn patterns
+    if _is_queens_hyphenated(addr):
+        return None
+    
+    # Early exit: Florida addresses by keyword
+    fl_keywords = ['bay harbor', 'beach view', 'indian creek', 'quayside',
+                   'belle meade', 'little river', 'bayshore', 'biscayne',
+                   'brickell', 'ocean drive', 'south ocean']
+    if any(kw in addr for kw in fl_keywords):
+        return None
     
     # Check named streets first (Gramercy Park South, Irving Place, 5th Ave, etc.)
     for street_name, value in NAMED_STREET_NEIGHBORHOOD.items():

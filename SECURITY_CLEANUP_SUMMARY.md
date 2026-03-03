@@ -11,9 +11,9 @@
 
 **Before:**
 ```python
-client_id = os.getenv("ZOHO_CLIENT_ID", "1000.BTVCVLRAA929UPUKPQ4A0Y2XS3WK8M")
-client_secret = os.getenv("ZOHO_CLIENT_SECRET", "4f9ff22d9bcb4b68bb60af7fefc05616974e355296")
-refresh_token = os.getenv("ZOHO_REFRESH_TOKEN", "1000.3ff810c474ffec8f0521d0d86923c052.2d1d1c684c2e23ffbe9f8b024535cfee")
+client_id = os.getenv("ZOHO_CLIENT_ID", "<your-zoho-client-id>")
+client_secret = os.getenv("ZOHO_CLIENT_SECRET", "<your-zoho-client-secret>")
+refresh_token = os.getenv("ZOHO_REFRESH_TOKEN", "<your-zoho-refresh-token>")
 ```
 
 **After:**
