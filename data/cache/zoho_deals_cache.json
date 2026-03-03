@@ -1,12 +1,96 @@
 {
-  "timestamp": "2026-02-20T19:51:46.044469",
+  "timestamp": "2026-03-03T15:40:57.704432",
   "deals": [
+    {
+      "Deal_Name": "475 Brickell Avenue #2605",
+      "Amount": 119841,
+      "Stage": "Proposal sent",
+      "id": "4981506000097654016",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Garfield Sinclair",
+        "id": "4981506000097199379"
+      },
+      "Neighborhood": "Brickell"
+    },
+    {
+      "Deal_Name": "180 West 93rd Street #4E",
+      "Amount": 159500,
+      "Stage": "HOT",
+      "id": "4981506000097512006",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Brian Carpenter",
+        "id": "4981506000096325464"
+      },
+      "Neighborhood": "Upper West Side"
+    },
+    {
+      "Deal_Name": "37 Devoe Street",
+      "Amount": 277500,
+      "Stage": "HOT",
+      "id": "4981506000097502002",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Jonathan Cloonan",
+        "id": "4981506000053942473"
+      },
+      "Neighborhood": "Williamsburg"
+    },
+    {
+      "Deal_Name": "128 East 70th Street #3",
+      "Amount": 145945,
+      "Stage": "WARM",
+      "id": "4981506000097234006",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "David Downing",
+        "id": "4981506000096338346"
+      },
+      "Neighborhood": "Upper East Side"
+    },
+    {
+      "Deal_Name": "1105 Northeast 116th Street",
+      "Amount": 429940,
+      "Stage": "Proposal sent",
+      "id": "4981506000096860036",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Maxwell Stiss",
+        "id": "4981506000096511456"
+      },
+      "Neighborhood": "North Miami"
+    },
+    {
+      "Deal_Name": "145 Northeast 101st Street",
+      "Amount": 173537,
+      "Stage": "Proposal sent",
+      "id": "4981506000096831036",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Laura Lefebvre Balard",
+        "id": "4981506000096055331"
+      },
+      "Neighborhood": "Upper East Side Miami"
+    },
+    {
+      "Deal_Name": "7410 JFK Boulevard East #4A",
+      "Amount": 74790,
+      "Stage": "COLD",
+      "id": "4981506000096823027",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Kevin O'Brien",
+        "id": "4981506000094855860"
+      },
+      "Neighborhood": null
+    },
     {
       "Deal_Name": "111 Glenview Road",
       "Amount": 94855,
-      "Stage": "Proposal sent",
+      "Stage": "Closed Lost",
       "id": "4981506000096816010",
-      "Closing_Date": null,
+      "Closing_Date": "2026-02-13",
       "Contact_Name": {
         "name": "Cecil House",
         "id": "4981506000095066131"
@@ -99,10 +183,10 @@
     },
     {
       "Deal_Name": "11 5th Ave #5V",
-      "Amount": 152000,
-      "Stage": "HOT",
+      "Amount": 128679.88,
+      "Stage": "Closed Won",
       "id": "4981506000096418064",
-      "Closing_Date": null,
+      "Closing_Date": "2026-03-03",
       "Contact_Name": {
         "name": "Karen Parekh",
         "id": "4981506000095675681"
@@ -123,7 +207,7 @@
     },
     {
       "Deal_Name": "517 West 46th Street #704",
-      "Amount": 70000,
+      "Amount": 85000,
       "Stage": "COLD",
       "id": "4981506000096289036",
       "Closing_Date": null,
@@ -183,7 +267,7 @@
     },
     {
       "Deal_Name": "394 15th Street #3R",
-      "Amount": 125000,
+      "Amount": 116000,
       "Stage": "HOT",
       "id": "4981506000095686081",
       "Closing_Date": null,
@@ -207,10 +291,10 @@
     },
     {
       "Deal_Name": "133 Barrow St #3B",
-      "Amount": 116500,
-      "Stage": "HOT",
+      "Amount": 119966,
+      "Stage": "Closed Won",
       "id": "4981506000095682024",
-      "Closing_Date": null,
+      "Closing_Date": "2026-02-27",
       "Contact_Name": {
         "name": "Dane Pitkin",
         "id": "4981506000094970110"
@@ -268,7 +352,7 @@
     {
       "Deal_Name": "17 Brewster Ter",
       "Amount": 177867,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000094371029",
       "Closing_Date": null,
       "Contact_Name": {
@@ -291,10 +375,10 @@
     },
     {
       "Deal_Name": "333 East 43rd Street #712",
-      "Amount": 136500,
-      "Stage": "HOT",
+      "Amount": 163835,
+      "Stage": "Closed Won",
       "id": "4981506000094049031",
-      "Closing_Date": null,
+      "Closing_Date": "2026-03-01",
       "Contact_Name": {
         "name": "Harald Tam",
         "id": "4981506000092681880"
@@ -303,7 +387,7 @@
     },
     {
       "Deal_Name": "127 Greene St #4",
-      "Amount": 155600,
+      "Amount": 180500,
       "Stage": "HOT",
       "id": "4981506000094045010",
       "Closing_Date": null,
@@ -352,7 +436,7 @@
     {
       "Deal_Name": "466 California Road",
       "Amount": 489700,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000093754002",
       "Closing_Date": null,
       "Contact_Name": {
@@ -400,7 +484,7 @@
     {
       "Deal_Name": "100 West 89th Street #4L",
       "Amount": 140000,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000093692008",
       "Closing_Date": null,
       "Contact_Name": {
@@ -479,7 +563,7 @@
         "name": "Paola Carrillo",
         "id": "4981506000090194160"
       },
-      "Neighborhood": "Bay Ridge"
+      "Neighborhood": "Rego Park"
     },
     {
       "Deal_Name": "32 Tompkins Road",
@@ -616,7 +700,7 @@
     {
       "Deal_Name": "2570C Frederick Douglass Blvd",
       "Amount": 149500,
-      "Stage": "WARM",
+      "Stage": "COLD",
       "id": "4981506000091427012",
       "Closing_Date": null,
       "Contact_Name": {
@@ -659,7 +743,7 @@
         "name": "Ryan Daniels",
         "id": "4981506000090417903"
       },
-      "Neighborhood": "Park Slope"
+      "Neighborhood": "Upper East Side Miami"
     },
     {
       "Deal_Name": "3748 Washington Ave",
@@ -1084,9 +1168,9 @@
     {
       "Deal_Name": "145 Tehama St",
       "Amount": 195000,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000086283018",
-      "Closing_Date": null,
+      "Closing_Date": "2026-02-24",
       "Contact_Name": {
         "name": "Noah Le",
         "id": "4981506000085297453"
@@ -1156,9 +1240,9 @@
     {
       "Deal_Name": "160 East 38th Street #2F",
       "Amount": 144831,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000085582016",
-      "Closing_Date": null,
+      "Closing_Date": "2026-02-24",
       "Contact_Name": {
         "name": "Christopher Iannaccone",
         "id": "4981506000084492870"
@@ -1420,9 +1504,9 @@
     {
       "Deal_Name": "67 East 11th Street #317",
       "Amount": 238972,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000082440012",
-      "Closing_Date": null,
+      "Closing_Date": "2026-02-24",
       "Contact_Name": {
         "name": "Hung Tran",
         "id": "4981506000081384496"
@@ -1955,7 +2039,7 @@
         "name": "Monica Jimenez",
         "id": "4981506000077880441"
       },
-      "Neighborhood": "Murray Hill"
+      "Neighborhood": "Rego Park"
     },
     {
       "Deal_Name": "5850 SW 62nd Pl",
@@ -1979,7 +2063,7 @@
         "name": "Adoni Abdulkarim",
         "id": "4981506000076270959"
       },
-      "Neighborhood": "Park Slope"
+      "Neighborhood": "Upper East Side Miami"
     },
     {
       "Deal_Name": "14160 SW 165th St",
@@ -2135,7 +2219,7 @@
         "name": "Sweha Patel",
         "id": "4981506000075419876"
       },
-      "Neighborhood": "Park Slope"
+      "Neighborhood": null
     },
     {
       "Deal_Name": "79 Northwest 97th Street",
@@ -2375,7 +2459,7 @@
         "name": "Erin Dolias",
         "id": "4981506000073419219"
       },
-      "Neighborhood": "Bay Ridge"
+      "Neighborhood": "Jackson Heights"
     },
     {
       "Deal_Name": "32 Gramercy Park South #3F",
@@ -2831,7 +2915,7 @@
         "name": "Suzanne ONeill",
         "id": "4981506000069692580"
       },
-      "Neighborhood": "Park Slope"
+      "Neighborhood": "Elmhurst"
     },
     {
       "Deal_Name": "26 Linn Place",
@@ -3347,7 +3431,7 @@
         "name": "Alice Lee",
         "id": "4981506000066725087"
       },
-      "Neighborhood": "Sunset Park"
+      "Neighborhood": "Rego Park"
     },
     {
       "Deal_Name": "373 Herkimer Street",
@@ -3695,7 +3779,7 @@
         "name": "Jeff Bodell",
         "id": "4981506000063988418"
       },
-      "Neighborhood": "South Beach"
+      "Neighborhood": "Fort Lauderdale"
     },
     {
       "Deal_Name": "9112 NE 10th Avenue",
@@ -3812,7 +3896,7 @@
       "id": "4981506000065259002",
       "Closing_Date": null,
       "Contact_Name": null,
-      "Neighborhood": "Downtown Miami"
+      "Neighborhood": "Wynwood"
     },
     {
       "Deal_Name": "195 Adams St #3B",
@@ -3836,7 +3920,7 @@
         "name": "Roger Tiffany",
         "id": "4981506000064150082"
       },
-      "Neighborhood": "Park Slope"
+      "Neighborhood": "Shenandoah"
     },
     {
       "Deal_Name": "383 Carlton Avenue #10S",
@@ -3980,7 +4064,7 @@
         "name": "Brendan Mahoney",
         "id": "4981506000063988471"
       },
-      "Neighborhood": "Downtown Miami"
+      "Neighborhood": "Wynwood"
     },
     {
       "Deal_Name": "942 East 40th Street",
@@ -4148,7 +4232,7 @@
         "name": "Lavinia Gabriele",
         "id": "4981506000062663144"
       },
-      "Neighborhood": "Downtown Miami"
+      "Neighborhood": "Aventura"
     },
     {
       "Deal_Name": "112 East 74th St #3S",
@@ -4196,7 +4280,7 @@
         "name": "Roni Amrussi",
         "id": "4981506000063165014"
       },
-      "Neighborhood": "Park Slope"
+      "Neighborhood": "Downtown Miami"
     },
     {
       "Deal_Name": "2 Rutherford Place",
@@ -4220,7 +4304,7 @@
         "name": "Christina Pumo",
         "id": "4981506000061298824"
       },
-      "Neighborhood": "Park Slope"
+      "Neighborhood": "Upper East Side Miami"
     },
     {
       "Deal_Name": "243 East 52nd Street",
@@ -4544,7 +4628,7 @@
         "name": "Marshall Buxton",
         "id": "4981506000060714032"
       },
-      "Neighborhood": "Bay Ridge"
+      "Neighborhood": "Jackson Heights"
     },
     {
       "Deal_Name": "35 Ogden Road",
@@ -4568,7 +4652,7 @@
         "name": "John Vides",
         "id": "4981506000060311249"
       },
-      "Neighborhood": "Park Slope"
+      "Neighborhood": "Palmetto Bay"
     },
     {
       "Deal_Name": "155 West 68th St #Apt 712",
@@ -4592,7 +4676,7 @@
         "name": "Daniel Ortiz",
         "id": "4981506000060894583"
       },
-      "Neighborhood": "Park Slope"
+      "Neighborhood": "Wynwood"
     },
     {
       "Deal_Name": "69-14 67th Street",
@@ -4604,7 +4688,7 @@
         "name": "Bhargava Chinthirla",
         "id": "4981506000060226802"
       },
-      "Neighborhood": "Bay Ridge"
+      "Neighborhood": "Rego Park"
     },
     {
       "Deal_Name": "226 East 95th Street #104 & #105",
@@ -4652,7 +4736,7 @@
         "name": "Alexei Segall",
         "id": "4981506000047712020"
       },
-      "Neighborhood": "Tribeca"
+      "Neighborhood": "North Beach"
     },
     {
       "Deal_Name": "303 West 66th Street #8JW",
@@ -4772,7 +4856,7 @@
         "name": "Steve Goodman",
         "id": "4981506000060018176"
       },
-      "Neighborhood": "Downtown Miami"
+      "Neighborhood": "Wynwood"
     },
     {
       "Deal_Name": "252 West 137th Street",
@@ -5168,7 +5252,7 @@
         "name": "Joyce Suazo",
         "id": "4981506000053534859"
       },
-      "Neighborhood": "Park Slope"
+      "Neighborhood": "Long Island City"
     },
     {
       "Deal_Name": "30 Chester Ct",
@@ -5228,7 +5312,7 @@
         "name": "Alexis Wong",
         "id": "4981506000056265504"
       },
-      "Neighborhood": "Park Slope"
+      "Neighborhood": "Westchester"
     },
     {
       "Deal_Name": "200 Rector Place",
@@ -5588,7 +5672,7 @@
         "name": "Anna Karagina",
         "id": "4981506000054255412"
       },
-      "Neighborhood": "Park Slope"
+      "Neighborhood": "Aventura"
     },
     {
       "Deal_Name": "2501 Southwest 22nd Avenue",
@@ -6008,7 +6092,7 @@
         "name": "Ross Brand",
         "id": "4981506000052785588"
       },
-      "Neighborhood": "South Beach"
+      "Neighborhood": "Kensington"
     },
     {
       "Deal_Name": "114 East 84th Street #6D",
@@ -6104,7 +6188,7 @@
         "name": "Jeniffer Roth",
         "id": "4981506000052551036"
       },
-      "Neighborhood": "Williamsburg"
+      "Neighborhood": "Hollywood"
     },
     {
       "Deal_Name": "132 East 35th Street #3H",
@@ -6500,7 +6584,7 @@
         "name": "Anyuli Gonzalez-Oliver",
         "id": "4981506000050197214"
       },
-      "Neighborhood": "Sunset Park"
+      "Neighborhood": "Astoria"
     },
     {
       "Deal_Name": "1776 James Avenue #5G",
@@ -6776,7 +6860,7 @@
         "name": "Nedzad Taljic",
         "id": "4981506000048707488"
       },
-      "Neighborhood": "South Beach"
+      "Neighborhood": "Fort Lauderdale"
     },
     {
       "Deal_Name": "301 West 57th Street #20CD",
@@ -7148,7 +7232,7 @@
         "name": "Rutul Dave",
         "id": "4981506000046469531"
       },
-      "Neighborhood": "Financial District"
+      "Neighborhood": "Park Slope"
     },
     {
       "Deal_Name": "600 Harbor Blvd #1045",
@@ -7256,7 +7340,7 @@
         "name": "Jonathan Goldman",
         "id": "4981506000045754039"
       },
-      "Neighborhood": "Park Slope"
+      "Neighborhood": "Upper East Side Miami"
     },
     {
       "Deal_Name": "347 West 57th Street #28A",
@@ -7532,7 +7616,7 @@
         "name": "Abhishek Naik",
         "id": "4981506000043998070"
       },
-      "Neighborhood": "Park Slope"
+      "Neighborhood": "Brickell"
     },
     {
       "Deal_Name": "101 N 5th Street #6A",
@@ -7568,7 +7652,7 @@
         "name": "Catherine Cing",
         "id": "4981506000043317047"
       },
-      "Neighborhood": "Park Slope"
+      "Neighborhood": "North Miami"
     },
     {
       "Deal_Name": "1688 West Ave 902",
@@ -8084,7 +8168,7 @@
         "name": "Luciana Cantor",
         "id": "4981506000032899050"
       },
-      "Neighborhood": "Park Slope"
+      "Neighborhood": "Wynwood"
     },
     {
       "Deal_Name": "30 W 63rd 16N",
@@ -8552,7 +8636,7 @@
         "name": "Brittani Carey",
         "id": "4981506000035645464"
       },
-      "Neighborhood": "Prospect Heights"
+      "Neighborhood": "Battery Park City"
     },
     {
       "Deal_Name": "67 Morton Street #2G",
@@ -9032,7 +9116,7 @@
         "name": "Morgan Jones",
         "id": "4981506000028937271"
       },
-      "Neighborhood": "Bay Ridge"
+      "Neighborhood": "Jackson Heights"
     },
     {
       "Deal_Name": "3146 McDonald Street",
@@ -9332,7 +9416,7 @@
         "name": "Stephan Wuerth",
         "id": "4981506000025573024"
       },
-      "Neighborhood": "Park Slope"
+      "Neighborhood": "Upper East Side Miami"
     },
     {
       "Deal_Name": "133 NE 2nd Ave",
@@ -9857,7 +9941,7 @@
         "name": "Rachel Shipman",
         "id": "4981506000021603053"
       },
-      "Neighborhood": "Tribeca"
+      "Neighborhood": "Bal Harbour"
     },
     {
       "Deal_Name": "7225 SW 76 St",
@@ -9878,7 +9962,7 @@
       "id": "4981506000022366018",
       "Closing_Date": "2023-11-06",
       "Contact_Name": null,
-      "Neighborhood": "Park Slope"
+      "Neighborhood": "Wynwood"
     },
     {
       "Deal_Name": "400 Convent Avenue #51",
@@ -10910,5 +10994,5 @@
       "Neighborhood": "Harlem"
     }
   ],
-  "count": 910
+  "count": 917
 }
