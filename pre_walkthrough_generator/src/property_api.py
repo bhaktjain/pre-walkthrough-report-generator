@@ -473,6 +473,9 @@ class PropertyAPI:
             ]
             search_queries = [q for q in search_queries if q]  # Remove None entries
             
+            # Track best same-building fallback (right building, wrong unit)
+            best_same_building_id = None
+            
             for query in search_queries:
                 params = {
                     "engine": "google",
@@ -601,6 +604,12 @@ class PropertyAPI:
                             if url_unit_match:
                                 url_unit = url_unit_match.group(1).upper()
                                 if url_unit != unit_number:
+                                    # Wrong unit but same building — save as fallback
+                                    if not best_same_building_id:
+                                        fallback_id = self.extract_property_id_from_url(link)
+                                        if fallback_id:
+                                            best_same_building_id = fallback_id
+                                            logger.info(f"SerpAPI: Saved same-building fallback ID {fallback_id} (unit {url_unit} instead of {unit_number})")
                                     logger.warning(f"SerpAPI result rejected - unit mismatch: requested {unit_number}, got {url_unit}")
                                     logger.warning(f"Rejected URL: {link}")
                                     continue  # Try next result
@@ -608,7 +617,12 @@ class PropertyAPI:
                                     logger.info(f"✓ Unit number validated: {unit_number} == {url_unit}")
                             else:
                                 # URL has no unit but we requested one - this is a building-level listing
-                                # Skip it; we want the unit-specific listing
+                                # Save as fallback if we don't have one yet
+                                if not best_same_building_id:
+                                    fallback_id = self.extract_property_id_from_url(link)
+                                    if fallback_id:
+                                        best_same_building_id = fallback_id
+                                        logger.info(f"SerpAPI: Saved building-level fallback ID {fallback_id}")
                                 logger.warning(f"SerpAPI result skipped - URL has no unit but unit {unit_number} was requested")
                                 logger.warning(f"Skipped URL: {link}")
                                 continue
@@ -619,6 +633,12 @@ class PropertyAPI:
                             return prop_id
                 
                 logger.info(f"Query '{query}' found no valid property ID after validation")
+            
+            # If exact unit not found but we have a same-building match, use it
+            # This gives us building-level data (year built, neighborhood, etc.)
+            if best_same_building_id:
+                logger.info(f"SerpAPI: Exact unit not found, using same-building fallback ID: {best_same_building_id}")
+                return best_same_building_id
             
             logger.warning("All SerpAPI queries failed to find valid property ID")
             return None
@@ -926,6 +946,9 @@ class PropertyAPI:
                 f"{base_address} site:realtor.com/realestateandhomes-detail",      # Without unit
             ]
             
+            # Track best same-building fallback (right building, wrong unit)
+            best_same_building_id = None
+            
             session = requests.Session()
             
             for query in search_queries:
@@ -1077,10 +1100,19 @@ class PropertyAPI:
                                         if url_unit_match:
                                             url_unit = url_unit_match.group(1).upper()
                                             if url_unit != unit_number:
+                                                # Wrong unit but same building — save as fallback
+                                                if not best_same_building_id:
+                                                    best_same_building_id = clean_id
+                                                    logger.info(f"DuckDuckGo: Saved same-building fallback ID {clean_id} (unit {url_unit} instead of {unit_number})")
                                                 logger.warning(f"DuckDuckGo: Property ID {clean_id} rejected - unit mismatch: requested {unit_number}, got {url_unit}")
                                                 continue  # Try next result
                                             else:
                                                 logger.info(f"DuckDuckGo: ✓ Unit number validated: {unit_number} == {url_unit}")
+                                        else:
+                                            # URL has no unit but we requested one - building-level listing
+                                            if not best_same_building_id:
+                                                best_same_building_id = clean_id
+                                                logger.info(f"DuckDuckGo: Saved building-level fallback ID {clean_id}")
                                     
                                     # Additional validation: check if main street name components are present
                                     addr_words = set(addr_street.split())
@@ -1111,6 +1143,12 @@ class PropertyAPI:
                 except Exception as e:
                     logger.error(f"Error with query '{query}': {e}")
                     continue
+            
+            # If exact unit not found but we have a same-building match, use it
+            # This gives us building-level data (year built, neighborhood, etc.)
+            if best_same_building_id:
+                logger.info(f"DuckDuckGo: Exact unit not found, using same-building fallback ID: {best_same_building_id}")
+                return best_same_building_id
             
             logger.warning("All DuckDuckGo search queries failed to find property ID")
             return None
