@@ -122,7 +122,12 @@ class NeighboringProjectsManager:
             from nyc_neighborhoods import get_neighborhood_from_address
             zip_neighborhood = get_neighborhood_from_address(target_address, use_geocoding=False)
         except ImportError:
-            pass
+            try:
+                # Try relative import path when running from project root
+                from pre_walkthrough_generator.src.nyc_neighborhoods import get_neighborhood_from_address
+                zip_neighborhood = get_neighborhood_from_address(target_address, use_geocoding=False)
+            except ImportError:
+                pass
 
         # Use ZIP-based neighborhood as primary (matches our cache),
         # fall back to provided neighborhood from API
