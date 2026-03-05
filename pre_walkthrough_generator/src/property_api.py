@@ -617,12 +617,12 @@ class PropertyAPI:
                                     logger.info(f"✓ Unit number validated: {unit_number} == {url_unit}")
                             else:
                                 # URL has no unit but we requested one - this is a building-level listing
-                                # Save as fallback if we don't have one yet
-                                if not best_same_building_id:
+                                # Only save as fallback if street number was actually confirmed to match
+                                if not best_same_building_id and url_street_num and requested_street_num and url_street_num == requested_street_num:
                                     fallback_id = self.extract_property_id_from_url(link)
                                     if fallback_id:
                                         best_same_building_id = fallback_id
-                                        logger.info(f"SerpAPI: Saved building-level fallback ID {fallback_id}")
+                                        logger.info(f"SerpAPI: Saved building-level fallback ID {fallback_id} (street num {url_street_num} confirmed)")
                                 logger.warning(f"SerpAPI result skipped - URL has no unit but unit {unit_number} was requested")
                                 logger.warning(f"Skipped URL: {link}")
                                 continue
@@ -1110,9 +1110,10 @@ class PropertyAPI:
                                                 logger.info(f"DuckDuckGo: ✓ Unit number validated: {unit_number} == {url_unit}")
                                         else:
                                             # URL has no unit but we requested one - building-level listing
-                                            if not best_same_building_id:
+                                            # Only save as fallback if street number was confirmed to match
+                                            if not best_same_building_id and addr_number_match and url_number_match and addr_number_match.group(1) == url_number_match.group(1):
                                                 best_same_building_id = clean_id
-                                                logger.info(f"DuckDuckGo: Saved building-level fallback ID {clean_id}")
+                                                logger.info(f"DuckDuckGo: Saved building-level fallback ID {clean_id} (street num {url_number_match.group(1)} confirmed)")
                                     
                                     # Additional validation: check if main street name components are present
                                     addr_words = set(addr_street.split())
