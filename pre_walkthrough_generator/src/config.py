@@ -10,16 +10,23 @@ class Config:
         self.serpapi_key = os.getenv('SERPAPI_KEY')
         self.api_host = "us-real-estate-listings.p.rapidapi.com"
         
-        # If environment variables are not set, try to load from config.json (for local development)
-        if not self.rapidapi_key or not self.openai_api_key:
+        # If any key is missing, try to load from config.json (for local development / server-side config)
+        if not self.rapidapi_key or not self.openai_api_key or not self.serpapi_key:
             try:
-                config_path = Path(__file__).parent.parent / 'config.json'
-                if config_path.exists():
-                    with open(config_path) as f:
-                        config_data = json.load(f)
-                        self.rapidapi_key = self.rapidapi_key or config_data.get('rapidapi_key')
-                        self.openai_api_key = self.openai_api_key or config_data.get('openai_api_key')
-                        self.serpapi_key = self.serpapi_key or config_data.get('serpapi_key')
+                # Check both root-level config.json and parent directory
+                for config_path in [
+                    Path(__file__).parent.parent / 'config.json',  # pre_walkthrough_generator/config.json
+                    Path('config.json'),                             # root config.json (server-side)
+                ]:
+                    if config_path.exists():
+                        with open(config_path) as f:
+                            config_data = json.load(f)
+                        # Support both flat keys and nested api_keys structure
+                        api_keys = config_data.get('api_keys', config_data)
+                        self.rapidapi_key = self.rapidapi_key or api_keys.get('rapidapi') or api_keys.get('rapidapi_key')
+                        self.openai_api_key = self.openai_api_key or api_keys.get('openai') or api_keys.get('openai_api_key')
+                        self.serpapi_key = self.serpapi_key or api_keys.get('serpapi') or api_keys.get('serpapi_key')
+                        break
             except (FileNotFoundError, json.JSONDecodeError) as e:
                 print(f"Warning: Could not load config.json: {e}")
                 # Continue with environment variables only
