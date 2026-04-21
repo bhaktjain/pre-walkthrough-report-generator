@@ -756,12 +756,18 @@ class PropertyAPI:
         direction_words = set(direction_normalize.keys()) | set(direction_normalize.values())
 
         def normalize_street_words(words):
-            return {direction_normalize.get(w, w) for w in words}
+            normalized = set()
+            for w in words:
+                w = direction_normalize.get(w, w)
+                # Strip ordinal suffixes: 27th -> 27, 3rd -> 3, 21st -> 21
+                w = re.sub(r'^(\d+)(st|nd|rd|th)$', r'\1', w)
+                normalized.add(w)
+            return normalized
 
         req_words = set(req_street.split())
         ret_words = set(ret_street.split())
 
-        # Normalize directions, then filter out all direction words
+        # Normalize directions and ordinals, then filter out direction words
         req_normalized = normalize_street_words(req_words)
         ret_normalized = normalize_street_words(ret_words)
         req_significant = {w for w in req_normalized if w not in direction_words}
