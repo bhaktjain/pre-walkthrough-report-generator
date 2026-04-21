@@ -755,14 +755,25 @@ class PropertyAPI:
             return False
         
         # Street names must have significant overlap
+        # Normalize directional prefixes before comparison (northeast -> ne, southwest -> sw, etc.)
+        direction_normalize = {
+            'northeast': 'ne', 'northwest': 'nw', 'southeast': 'se', 'southwest': 'sw',
+            'north': 'n', 'south': 's', 'east': 'e', 'west': 'w',
+        }
+        direction_words = set(direction_normalize.keys()) | set(direction_normalize.values())
+
+        def normalize_street_words(words):
+            return {direction_normalize.get(w, w) for w in words}
+
         req_words = set(req_street.split())
         ret_words = set(ret_street.split())
-        
-        # Get significant words (not directional prefixes)
-        direction_words = {'east', 'west', 'north', 'south', 'e', 'w', 'n', 's'}
-        req_significant = {w for w in req_words if w not in direction_words}
-        ret_significant = {w for w in ret_words if w not in direction_words}
-        
+
+        # Normalize directions, then filter out all direction words
+        req_normalized = normalize_street_words(req_words)
+        ret_normalized = normalize_street_words(ret_words)
+        req_significant = {w for w in req_normalized if w not in direction_words}
+        ret_significant = {w for w in ret_normalized if w not in direction_words}
+
         # Check for overlap
         if req_significant and ret_significant:
             overlap = req_significant & ret_significant
