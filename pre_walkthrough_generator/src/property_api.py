@@ -87,16 +87,12 @@ class PropertyAPI:
         """Get detailed property information using property ID (live RapidAPI)."""
         import re
         try:
-            print(f"Fetching details for property ID: {property_id}")
+            logger.info(f"Fetching details for property ID: {property_id}")
             data = self._make_request("/v2/property", {"id": property_id})
-            print("\n[DEBUG] Raw API response type:", type(data))
             if isinstance(data, dict):
-                print("[DEBUG] Raw API response keys:", list(data.keys()))
-            print("[DEBUG] /v2/property API response:")
-            print(json.dumps(data, indent=2))
+                logger.info(f"[DEBUG] Raw API response keys: {list(data.keys())}")
             if not data or 'data' not in data or not data['data']:
-                print("[ERROR] API response missing 'data' key or property data is empty. Full response:")
-                print(data)
+                logger.error(f"[ERROR] API response missing 'data' key or empty. Keys: {list(data.keys()) if isinstance(data, dict) else type(data)}")
                 return {}
             d = data['data']
 
@@ -151,7 +147,7 @@ class PropertyAPI:
                 price = search_details_any(r'Price: \$?([\d,]+)')
                 if price:
                     price = int(price.replace(',', ''))
-            print(f"[DEBUG] Price: {price}")
+            logger.info(f"[DEBUG] Price: {price}")
 
             # Last sold price and date
             last_sold_price = d.get('last_sold_price')
@@ -166,10 +162,8 @@ class PropertyAPI:
                             last_sold_date = hist['date']
                         if last_sold_price and last_sold_date:
                             break
-            print(f"[DEBUG] Last Sold Price: {last_sold_price}")
-            print(f"[DEBUG] Last Sold Date: {last_sold_date}")
-
-            # Bedrooms
+            logger.info(f"[DEBUG] Last Sold Price: {last_sold_price}")
+            logger.info(f"[DEBUG] Last Sold Date: {last_sold_date}")
             description = d.get('description') or {}
             bedrooms = description.get('beds')
             if not bedrooms:
@@ -182,7 +176,7 @@ class PropertyAPI:
                 bedrooms = search_details_any(r'Bedroom[s]?: (\d+)')
             if not bedrooms:
                 bedrooms = 'Information not available'
-            print(f"[DEBUG] Bedrooms: {bedrooms}")
+            logger.info(f"[DEBUG] Bedrooms: {bedrooms}")
 
             # Bathrooms
             bathrooms = description.get('baths') or description.get('baths_consolidated')
@@ -196,7 +190,7 @@ class PropertyAPI:
                 bathrooms = search_details_any(r'Bathroom[s]?: (\d+)')
             if not bathrooms:
                 bathrooms = 'Information not available'
-            print(f"[DEBUG] Bathrooms: {bathrooms}")
+            logger.info(f"[DEBUG] Bathrooms: {bathrooms}")
 
             # Rooms (total rooms)
             rooms = search_details('Other Rooms', r'Total Rooms: (\d+)')
@@ -204,7 +198,7 @@ class PropertyAPI:
                 rooms = search_details_any(r'Total Rooms: (\d+)')
             if not rooms:
                 rooms = 'Information not available'
-            print(f"[DEBUG] Rooms: {rooms}")
+            logger.info(f"[DEBUG] Rooms: {rooms}")
 
             # Sqft
             sqft = description.get('sqft')
@@ -220,7 +214,7 @@ class PropertyAPI:
                         break
             if not sqft:
                 sqft = 'Information not available'
-            print(f"[DEBUG] Sqft: {sqft}")
+            logger.info(f"[DEBUG] Sqft: {sqft}")
 
             # Year Built
             year_built = description.get('year_built')
@@ -228,7 +222,7 @@ class PropertyAPI:
                 year_built = search_details_any(r'Year Built: (\d{4})')
             if not year_built:
                 year_built = 'Information not available'
-            print(f"[DEBUG] Year Built: {year_built}")
+            logger.info(f"[DEBUG] Year Built: {year_built}")
 
             # HOA Fee
             # 'hoa' may be explicitly set to null which breaks chained .get calls
@@ -240,7 +234,7 @@ class PropertyAPI:
                 hoa_fee = search_details_any(r'Association Fee: (\d+)')
             if not hoa_fee:
                 hoa_fee = 'Information not available'
-            print(f"[DEBUG] HOA Fee: {hoa_fee}")
+            logger.info(f"[DEBUG] HOA Fee: {hoa_fee}")
 
             # Property Type
             property_type = description.get('type') or description.get('sub_type')
@@ -256,7 +250,7 @@ class PropertyAPI:
                             break
             if not property_type:
                 property_type = 'Information not available'
-            print(f"[DEBUG] Property Type: {property_type}")
+            logger.info(f"[DEBUG] Property Type: {property_type}")
 
             # Neighborhood
             neighborhood = None
@@ -275,7 +269,7 @@ class PropertyAPI:
                             break
             if not neighborhood:
                 neighborhood = 'Information not available'
-            print(f"[DEBUG] Neighborhood: {neighborhood}")
+            logger.info(f"[DEBUG] Neighborhood: {neighborhood}")
 
             # Photos and floor plans
             photos = []
@@ -294,7 +288,7 @@ class PropertyAPI:
                     else:
                         photos.append({"url": href, "description": "photo"})
             except Exception as photo_error:
-                print(f"[DEBUG] Error processing photos: {photo_error}")
+                logger.warning(f"[DEBUG] Error processing photos: {photo_error}")
                 photos = []
                 floor_plans = []
 
@@ -326,7 +320,7 @@ class PropertyAPI:
                         if listing_url:
                             break
             
-            print(f"[DEBUG] Found listing URL in API response: {listing_url}")
+            logger.info(f"[DEBUG] Found listing URL in API response: {listing_url}")
 
             details = {
                 'address': address or 'Information not available',
@@ -346,13 +340,12 @@ class PropertyAPI:
                 'neighborhood': neighborhood,
                 'photos': photos,
                 'floor_plans': floor_plans,
-                'listing_url': listing_url  # Add the URL from API response
+                'listing_url': listing_url
             }
-            print("\n[DEBUG] Extracted property details to return:")
-            print(json.dumps(details, indent=2, default=str))
+            logger.info(f"[DEBUG] Extracted details: beds={bedrooms}, baths={bathrooms}, sqft={sqft}, year={year_built}, price={price}")
             return details
         except Exception as e:
-            print(f"Error in get_property_details: {e}")
+            logger.error(f"Error in get_property_details: {e}", exc_info=True)
             return {}
 
     def get_property_photos(self, property_id: str) -> Dict[str, Any]:
