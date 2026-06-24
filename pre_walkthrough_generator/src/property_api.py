@@ -261,8 +261,9 @@ class PropertyAPI:
                     href = photo.get('href')
                     if not href:
                         continue
-                    tags = [tag.get('label', '') for tag in (photo.get('tags') or []) if tag and tag.get('label')]
-                    if 'floor_plan' in tags:
+                    tags = [str(tag.get('label', '')) for tag in (photo.get('tags') or []) if tag and tag.get('label')]
+                    blob = (" ".join(tags) + " " + str(href)).lower()
+                    if any(k in blob for k in ('floor_plan', 'floor plan', 'floorplan', 'floor-plan')):
                         floor_plans.append({"url": href, "description": "floor_plan"})
                     else:
                         photos.append({"url": href, "description": "photo"})
@@ -348,7 +349,9 @@ class PropertyAPI:
                 if not url:
                     continue
                 tags = img.get("tags", [])
-                if any(t.get("label") == "floor_plan" for t in tags):
+                label_blob = " ".join(str(t.get("label", "")) for t in tags).lower()
+                blob = (label_blob + " " + str(img.get("description", "")) + " " + str(url)).lower()
+                if any(k in blob for k in ("floor_plan", "floor plan", "floorplan", "floor-plan")):
                     floor_plans.append({"url": url, "description": "floor_plan"})
                 all_imgs.append({"url": url, "description": img.get("description", "")})
 
@@ -411,7 +414,11 @@ class PropertyAPI:
         """Get property ID using SerpAPI (Google Search) - Most reliable method."""
         if not self.serpapi_key:
             return None
-        
+
+        # Best same-building fallback (right building, wrong/no unit). Defined
+        # before the try so a mid-loop exception (e.g. a SerpAPI read timeout)
+        # can still return it instead of discarding it and returning None.
+        best_same_building_id = None
         try:
             # Normalize the address for search: convert "#8C" to "Apt 8C" since Google strips #
             search_address = re.sub(r'#\s*([a-zA-Z0-9/]+)', r'Apt \1', address)
@@ -445,9 +452,6 @@ class PropertyAPI:
             ]
             search_queries = [q for q in search_queries if q]  # Remove None entries
             
-            # Track best same-building fallback (right building, wrong unit)
-            best_same_building_id = None
-            
             for query in search_queries:
                 params = {
                     "engine": "google",
@@ -457,14 +461,17 @@ class PropertyAPI:
                 }
                 
                 logger.info(f"SerpAPI query: {params['q']}")
-                resp = requests.get("https://serpapi.com/search.json", params=params, timeout=15)
-                logger.info(f"SerpAPI status: {resp.status_code}")
-                
-                if resp.status_code != 200:
-                    logger.warning(f"SerpAPI returned status {resp.status_code}")
+                # A single query's timeout must not abort the whole lookup — catch
+                # it and move on so we can still return the building-level fallback.
+                try:
+                    resp = requests.get("https://serpapi.com/search.json", params=params, timeout=12)
+                    if resp.status_code != 200:
+                        logger.warning(f"SerpAPI returned status {resp.status_code}")
+                        continue
+                    data = resp.json()
+                except Exception as qe:
+                    logger.warning(f"SerpAPI query timed out/failed; trying next query: {qe}")
                     continue
-                
-                data = resp.json()
                 
                 # Extract street number from requested address for validation
                 addr_number_match = re.search(r'^(\d+)', base_address.strip())
@@ -617,7 +624,7 @@ class PropertyAPI:
             
         except Exception as e:
             logger.error(f"Error in SerpAPI lookup: {e}")
-            return None
+            return best_same_building_id  # use building-level fallback if we found one
 
     def _normalize_street_type(self, street_type: str) -> str:
         """Normalize street type to a canonical form for comparison."""
@@ -966,7 +973,7 @@ class PropertyAPI:
                     # Add random delay to avoid rate limiting
                     time.sleep(random.uniform(1, 3))
                     
-                    resp = session.get(url, headers=headers, timeout=15)
+                    resp = session.get(url, headers=headers, timeout=6)
                     logger.info(f"DuckDuckGo response status: {resp.status_code}")
                     
                     if resp.status_code == 202:
@@ -1233,7 +1240,7 @@ class PropertyAPI:
 
             # Retry up to 3 times with small back-off when Realtor blocks (429) or temporary error
             for attempt in range(3):
-                resp = requests.get(search_url, headers=headers, timeout=10)
+                resp = requests.get(search_url, headers=headers, timeout=8)
                 logger.debug(f"[DEBUG] _realtor_site_search_url: Attempt {attempt+1}, status: {resp.status_code}")
                 if resp.status_code == 200:
                     break
@@ -1289,7 +1296,7 @@ class PropertyAPI:
                 query = urllib.parse.quote_plus(f"{v} site:realtor.com/realestateandhomes-detail")
                 url = f"https://duckduckgo.com/html/?q={query}"
                 logger.debug(f"[DEBUG] _scrape_realtor_url_duckduckgo: Searching DuckDuckGo with URL: {url}")
-                resp = requests.get(url, headers=headers, timeout=10)
+                resp = requests.get(url, headers=headers, timeout=6)
                 logger.debug(f"[DEBUG] _scrape_realtor_url_duckduckgo: DuckDuckGo status: {resp.status_code}")
                 if resp.status_code != 200:
                     continue
