@@ -66,6 +66,10 @@ func.log
 temp/
 tmp/
 
+# Word/Office temp & lock files (e.g. ~$eWalk_...docx)
+~$*
+~$*.docx
+
 # Generated reports (optional - you might want to keep some for testing)
 data/*.docx
 data/*.pdf

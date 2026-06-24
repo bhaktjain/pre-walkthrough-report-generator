@@ -13,7 +13,13 @@ sys.path.insert(0, str(Path(__file__).parent / "pre_walkthrough_generator" / "sr
 
 from zoho_api import ZohoAPI
 from neighboring_projects import NeighboringProjectsManager
+from nyc_neighborhoods import enrich_deals_with_neighborhoods
 import logging
+
+try:
+    from config import get_config
+except Exception:  # pragma: no cover
+    get_config = None
 
 # Setup logging
 logging.basicConfig(
@@ -30,7 +36,14 @@ def sync_deals():
     client_id = os.getenv("ZOHO_CLIENT_ID")
     client_secret = os.getenv("ZOHO_CLIENT_SECRET")
     refresh_token = os.getenv("ZOHO_REFRESH_TOKEN")
-    
+
+    # Fall back to config.json if the environment doesn't carry the credentials.
+    if not all([client_id, client_secret, refresh_token]) and get_config:
+        cfg = get_config()
+        client_id = client_id or cfg.zoho_client_id
+        client_secret = client_secret or cfg.zoho_client_secret
+        refresh_token = refresh_token or cfg.zoho_refresh_token
+
     if not all([client_id, client_secret, refresh_token]):
         logger.error("Missing Zoho credentials. Please set ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, and ZOHO_REFRESH_TOKEN environment variables.")
         return False
@@ -50,7 +63,12 @@ def sync_deals():
             return False
         
         logger.info(f"Fetched {len(deals)} deals from Zoho CRM")
-        
+
+        # Tag each deal with its NYC neighborhood BEFORE caching — without this the
+        # cache has no Neighborhood field and report-time matching always returns 0.
+        logger.info("Enriching deals with neighborhoods...")
+        enrich_deals_with_neighborhoods(deals, use_geocoding=True)
+
         # Save to cache
         logger.info("Saving deals to cache...")
         manager = NeighboringProjectsManager()

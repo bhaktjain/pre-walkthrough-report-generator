@@ -1,3 +1,3 @@
 #!/bin/bash
 cd /home/site/wwwroot
-python -m gunicorn --bind=0.0.0.0 --timeout 600 app:app 
+python -m gunicorn app:app -k uvicorn.workers.UvicornWorker --bind=0.0.0.0 --timeout 600 

@@ -10,7 +10,7 @@ pip install --upgrade pip
 
 # Install main requirements
 echo "Installing main requirements..."
-pip install -r render_requirements.txt
+pip install -r requirements.txt
 
 # Create necessary directories
 echo "Creating directories..."

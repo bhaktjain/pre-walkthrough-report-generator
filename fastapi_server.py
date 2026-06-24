@@ -1,22 +1,26 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Header, Depends
 from fastapi.responses import FileResponse
 import uvicorn
 import tempfile
 import os
 import sys
+import copy
+import hmac
 from pathlib import Path
+from typing import Optional
 import logging
 import json
 import re
 from config_manager import config_manager
-import time
 from datetime import datetime
 from pydantic import BaseModel
 
 # Add the pre_walkthrough_generator to the path
 sys.path.append(str(Path(__file__).parent / "pre_walkthrough_generator" / "src"))
 
-# Import the modules directly to avoid relative import issues
+# Import the pipeline modules directly (sys.path includes the src dir above).
+# Fail fast on any import/config error rather than starting a half-initialized
+# app that 500s at request time.
 try:
     import config
     import transcript_processor
@@ -26,13 +30,6 @@ try:
 except ImportError as e:
     logging.error(f"Import error: {e}")
     raise
-except Exception as e:
-    logging.error(f"Configuration error: {e}")
-    # Continue anyway - the config will be handled by environment variables
-    import transcript_processor
-    import property_api
-    import document_generator
-    from neighboring_projects import NeighboringProjectsManager
 
 # Configure logging
 logging.basicConfig(
@@ -59,6 +56,41 @@ server_metrics = {
     "last_request": None
 }
 
+# --- Admin auth, upload limits, and secret redaction -------------------------
+ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY")
+MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", 10 * 1024 * 1024))  # 10 MB
+ALLOWED_TRANSCRIPT_EXTS = {".txt", ".json", ".jsonl", ".md", ".docx", ".pdf"}
+ALLOWED_TEMPLATE_EXTS = {".docx"}
+
+
+def require_admin(x_admin_key: Optional[str] = Header(default=None)):
+    """Gate admin endpoints behind a shared secret (env ADMIN_API_KEY).
+
+    Fail-closed: if ADMIN_API_KEY is not configured the endpoints are disabled,
+    so config/secrets are never exposed by default.
+    """
+    if not ADMIN_API_KEY:
+        raise HTTPException(status_code=503, detail="Admin endpoints are disabled (set ADMIN_API_KEY to enable).")
+    if not x_admin_key or not hmac.compare_digest(x_admin_key, ADMIN_API_KEY):
+        raise HTTPException(status_code=401, detail="Invalid or missing admin key.")
+    return True
+
+
+def _redact_config(cfg) -> dict:
+    """Deep-copy the config with all secret values masked."""
+    try:
+        redacted = copy.deepcopy(cfg)
+    except Exception:
+        return {"error": "config unavailable"}
+    api_keys = redacted.get("api_keys") if isinstance(redacted, dict) else None
+    if isinstance(api_keys, dict):
+        def _mask(v):
+            if isinstance(v, dict):
+                return {k: _mask(sv) for k, sv in v.items()}
+            return "***redacted***" if v else ""
+        redacted["api_keys"] = {k: _mask(v) for k, v in api_keys.items()}
+    return redacted
+
 @app.on_event("startup")
 async def startup_sync_zoho_cache():
     """On startup, try to refresh Zoho deals cache if stale and credentials are available."""
@@ -71,22 +103,27 @@ async def startup_sync_zoho_cache():
             logger.info(f"Zoho cache is valid ({stats['count']} deals, {stats.get('age_hours', 0):.1f}h old). Skipping sync.")
             return
         
-        # Cache is missing or stale — try to sync
-        zoho_client_id = os.environ.get("ZOHO_CLIENT_ID")
-        zoho_client_secret = os.environ.get("ZOHO_CLIENT_SECRET")
-        zoho_refresh_token = os.environ.get("ZOHO_REFRESH_TOKEN")
-        
+        # Cache is missing or stale — try to sync. Credentials come from the
+        # environment first, then config.json (via Config).
+        cfg = config.Config()
+        zoho_client_id = os.environ.get("ZOHO_CLIENT_ID") or cfg.zoho_client_id
+        zoho_client_secret = os.environ.get("ZOHO_CLIENT_SECRET") or cfg.zoho_client_secret
+        zoho_refresh_token = os.environ.get("ZOHO_REFRESH_TOKEN") or cfg.zoho_refresh_token
+
         if not all([zoho_client_id, zoho_client_secret, zoho_refresh_token]):
             logger.warning("Zoho credentials not configured. Neighboring projects will use existing cache if available.")
             return
-        
+
         logger.info("Zoho cache is stale or missing. Syncing deals...")
         from zoho_api import ZohoAPI
+        from nyc_neighborhoods import enrich_deals_with_neighborhoods
         zoho = ZohoAPI(zoho_client_id, zoho_client_secret, zoho_refresh_token)
         fields = ["Deal_Name", "Amount", "Stage", "Contact_Name", "Closing_Date"]
         deals = zoho.get_all_records("Deals", fields=fields, max_records=5000)
-        
+
         if deals:
+            # Tag with neighborhoods before caching so report-time matching works.
+            enrich_deals_with_neighborhoods(deals, use_geocoding=True)
             manager.save_cache(deals)
             logger.info(f"Zoho cache refreshed: {len(deals)} deals")
         else:
@@ -109,11 +146,11 @@ async def health_check():
     }
 
 @app.get("/metrics")
-async def get_metrics():
-    """Get detailed server metrics"""
+async def get_metrics(_: bool = Depends(require_admin)):
+    """Get detailed server metrics (admin only; secrets redacted)"""
     return {
         "server_metrics": server_metrics,
-        "config": config_manager.config,
+        "config": _redact_config(config_manager.config),
         "memory_usage": "Available via system monitoring"
     }
 
@@ -156,8 +193,8 @@ def process_transcript_and_generate_report(transcript_path: str, address: str = 
         # Initialize components
         config_obj = config.Config()
         doc_generator = document_generator.DocumentGenerator()
-        transcript_processor_obj = transcript_processor.TranscriptProcessor(config_obj.openai_api_key)
-        property_api_obj = property_api.PropertyAPI(config_obj.rapidapi_key, config_obj.openai_api_key, config_obj.serpapi_key)
+        transcript_processor_obj = transcript_processor.TranscriptProcessor(config_obj.anthropic_api_key, config_obj.claude_model)
+        property_api_obj = property_api.PropertyAPI(config_obj.rapidapi_key, config_obj.serpapi_key)
 
         # Read and clean transcript
         with open(transcript_path, 'r') as f:
@@ -353,9 +390,17 @@ async def generate_report(
         server_metrics["last_request"] = datetime.now().isoformat()
         logger.info(f"Received request to generate report for file: {transcript_file.filename}")
         
+        # Validate the upload (size + extension) before persisting it.
+        content = await transcript_file.read()
+        if len(content) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="Transcript file too large.")
+        safe_name = os.path.basename(transcript_file.filename or "transcript")
+        ext = Path(safe_name).suffix.lower()
+        if ext and ext not in ALLOWED_TRANSCRIPT_EXTS:
+            raise HTTPException(status_code=415, detail=f"Unsupported file type: {ext}")
+
         # Create a temporary file to save the uploaded transcript
-        with tempfile.NamedTemporaryFile(delete=False, suffix=f"_{transcript_file.filename}") as temp_file:
-            content = await transcript_file.read()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f"_{safe_name}") as temp_file:
             temp_file.write(content)
             temp_file_path = temp_file.name
         
@@ -383,6 +428,11 @@ async def generate_report(
             filename=f"PreWalkReport_{last_name or 'Report'}.docx"
         )
         
+    except HTTPException:
+        # Propagate intended HTTP errors (413/415/etc.) unchanged.
+        if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
+        raise
     except Exception as e:
         server_metrics["errors"] += 1
         logger.error(f"Error generating report: {str(e)}")
@@ -471,6 +521,11 @@ async def generate_report_from_text(request: TranscriptRequest):
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             filename=f"PreWalkReport_{request.last_name or 'Report'}.docx"
         )
+    except HTTPException:
+        # Propagate intended HTTP errors (400/etc.) unchanged.
+        if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
+        raise
     except Exception as e:
         logger.error(f"Error generating report: {str(e)}")
         # Clean up temporary file if it exists
@@ -479,24 +534,29 @@ async def generate_report_from_text(request: TranscriptRequest):
         raise HTTPException(status_code=500, detail=f"Error generating report: {str(e)}")
 
 @app.get("/config")
-async def get_config():
-    """Get current configuration"""
-    return config_manager.config
+async def get_config(_: bool = Depends(require_admin)):
+    """Get current configuration (admin only; secrets redacted)"""
+    return _redact_config(config_manager.config)
 
 @app.post("/config/reload")
-async def reload_config():
-    """Reload configuration from file"""
-    config = config_manager.reload_config()
-    return {"message": "Configuration reloaded", "config": config}
+async def reload_config(_: bool = Depends(require_admin)):
+    """Reload configuration from file (admin only)"""
+    config_manager.reload_config()
+    return {"message": "Configuration reloaded", "config": _redact_config(config_manager.config)}
 
 @app.put("/config/api-keys")
 async def update_api_keys(
-    openai_key: str = None,
+    anthropic_key: str = None,
     rapidapi_key: str = None,
-    serpapi_key: str = None
+    serpapi_key: str = None,
+    _: bool = Depends(require_admin),
 ):
-    """Update API keys dynamically"""
-    config_manager.update_api_keys(openai_key, rapidapi_key, serpapi_key)
+    """Update API keys dynamically (admin only).
+
+    Note: the live pipeline reads keys from the environment / config.json at
+    process start, so this only updates the on-disk config for the next reload.
+    """
+    config_manager.update_api_keys(anthropic_key, rapidapi_key, serpapi_key)
     return {"message": "API keys updated successfully"}
 
 @app.put("/config/settings")
@@ -504,9 +564,10 @@ async def update_settings(
     max_file_size: int = None,
     timeout: int = None,
     enable_logging: bool = None,
-    log_level: str = None
+    log_level: str = None,
+    _: bool = Depends(require_admin),
 ):
-    """Update server settings dynamically"""
+    """Update server settings dynamically (admin only)"""
     if max_file_size is not None:
         config_manager.set("settings.max_file_size", max_file_size)
     if timeout is not None:
@@ -519,36 +580,44 @@ async def update_settings(
 
 @app.put("/config/templates")
 async def update_templates(
-    default_template: str = None
+    default_template: str = None,
+    _: bool = Depends(require_admin),
 ):
-    """Update template settings"""
+    """Update template settings (admin only)"""
     if default_template is not None:
         config_manager.set("templates.default_template", default_template)
     return {"message": "Template settings updated successfully"}
 
 @app.post("/templates/upload")
 async def upload_template(
-    template_file: UploadFile = File(...)
+    template_file: UploadFile = File(...),
+    _: bool = Depends(require_admin),
 ):
-    """Upload a new template file"""
+    """Upload a new template file (admin only)"""
     try:
-        # Save template to templates directory
+        # Reject anything but a .docx, and strip any path components from the
+        # client-supplied filename to prevent path traversal (e.g. ../config.json).
+        safe_name = os.path.basename(template_file.filename or "")
+        if not safe_name or Path(safe_name).suffix.lower() not in ALLOWED_TEMPLATE_EXTS:
+            raise HTTPException(status_code=415, detail="Only .docx templates are allowed.")
+
         template_dir = Path("templates")
         template_dir.mkdir(exist_ok=True)
-        
-        template_path = template_dir / template_file.filename
+        template_path = (template_dir / safe_name).resolve()
+        if template_dir.resolve() != template_path.parent:
+            raise HTTPException(status_code=400, detail="Invalid template path.")
+
+        content = await template_file.read()
+        if len(content) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="Template file too large.")
+
         with open(template_path, "wb") as f:
-            content = await template_file.read()
             f.write(content)
-        
-        # Update config to use new template
-        config_manager.set("templates.default_template", template_file.filename)
-        
-        return {
-            "message": "Template uploaded successfully",
-            "filename": template_file.filename,
-            "path": str(template_path)
-        }
+
+        config_manager.set("templates.default_template", safe_name)
+        return {"message": "Template uploaded successfully", "filename": safe_name}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error uploading template: {str(e)}")
 

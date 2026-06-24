@@ -11,9 +11,10 @@ class ProductionConfig(BaseSettings):
     """Production configuration settings"""
     
     # API Keys (Required)
-    openai_api_key: str = Field(..., env="OPENAI_API_KEY")
+    anthropic_api_key: str = Field(..., env="ANTHROPIC_API_KEY")
     rapidapi_key: str = Field(..., env="RAPIDAPI_KEY")
     serpapi_key: Optional[str] = Field(None, env="SERPAPI_KEY")
+    openai_api_key: Optional[str] = Field(None, env="OPENAI_API_KEY")  # legacy, no longer used
     
     # Server Settings
     host: str = Field("0.0.0.0", env="HOST")
@@ -50,7 +51,7 @@ class ProductionConfig(BaseSettings):
     output_dir: str = Field("data", env="OUTPUT_DIR")
     
     # External Services
-    openai_base_url: Optional[str] = Field(None, env="OPENAI_BASE_URL")
+    anthropic_base_url: Optional[str] = Field(None, env="ANTHROPIC_BASE_URL")
     rapidapi_base_url: str = Field("https://realtor.p.rapidapi.com", env="RAPIDAPI_BASE_URL")
     
     # Feature Flags

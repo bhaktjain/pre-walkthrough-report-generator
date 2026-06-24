@@ -1,6 +1,6 @@
 {
   "api_keys": {
-    "openai": "your-openai-api-key-here",
+    "anthropic": "your-anthropic-api-key-here",
     "rapidapi": "your-rapidapi-key-here",
     "serpapi": "your-serpapi-key-here",
     "zoho": {

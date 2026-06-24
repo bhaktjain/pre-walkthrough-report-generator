@@ -22,14 +22,13 @@ def enhance_cache_with_neighborhoods():
     # Load environment variables
     serpapi_key = os.getenv('SERPAPI_KEY')
     rapidapi_key = os.getenv('RAPIDAPI_KEY')
-    openai_key = os.getenv('OPENAI_API_KEY')
-    
+
     if not rapidapi_key:
         print("ERROR: RAPIDAPI_KEY not found in environment")
         return
     
     # Initialize PropertyAPI
-    api = PropertyAPI(rapidapi_key, openai_key, serpapi_key)
+    api = PropertyAPI(rapidapi_key, serpapi_key)
     
     # Load cache
     cache_file = Path("data/cache/zoho_deals_cache.json")
