@@ -13,6 +13,28 @@ import re
 
 logger = logging.getLogger(__name__)
 
+# Import neighborhood-resolution helpers once, at module load, so an import
+# failure is logged loudly instead of being silently swallowed on every call
+# (which previously degraded matching to "same building only" with no signal).
+try:
+    from nyc_neighborhoods import (
+        get_neighborhood_from_address,
+        enrich_deals_with_neighborhoods,
+    )
+except ImportError:
+    try:
+        from pre_walkthrough_generator.src.nyc_neighborhoods import (
+            get_neighborhood_from_address,
+            enrich_deals_with_neighborhoods,
+        )
+    except ImportError as _imp_err:  # pragma: no cover
+        get_neighborhood_from_address = None
+        enrich_deals_with_neighborhoods = None
+        logger.error(
+            "Could not import nyc_neighborhoods — neighborhood matching disabled: %s",
+            _imp_err,
+        )
+
 
 class NeighboringProjectsManager:
     """Manages neighboring projects cache and matching logic"""
@@ -54,8 +76,48 @@ class NeighboringProjectsManager:
         street2 = norm2.split(',')[0].strip()
         return street1 == street2
 
-    def save_cache(self, deals: List[Dict[str, Any]]) -> None:
-        """Save deals to cache file"""
+    def _read_cache_file(self) -> Optional[Dict[str, Any]]:
+        """Read and parse the raw cache file (no freshness check)."""
+        if not self.cache_file.exists():
+            return None
+        try:
+            with open(self.cache_file, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            logger.error(f"Error reading cache file: {e}")
+            return None
+
+    def _cache_age(self, cache_data: Dict[str, Any]) -> Optional[timedelta]:
+        try:
+            return datetime.now() - datetime.fromisoformat(cache_data["timestamp"])
+        except Exception:
+            return None
+
+    def save_cache(self, deals: List[Dict[str, Any]], preserve_neighborhoods: bool = True) -> None:
+        """Save deals to cache file.
+
+        When ``preserve_neighborhoods`` is set, carry forward any ``Neighborhood``
+        tags from the existing cache (matched by ``Deal_Name``) onto incoming deals
+        that lack one. This prevents a raw re-sync (which fetches deals without a
+        ``Neighborhood`` field) from wiping previously-computed neighborhoods.
+        """
+        if preserve_neighborhoods:
+            try:
+                existing = self._read_cache_file()
+                if existing:
+                    prior = {
+                        d.get("Deal_Name"): d.get("Neighborhood")
+                        for d in existing.get("deals", [])
+                        if d.get("Deal_Name") and d.get("Neighborhood")
+                    }
+                    for deal in deals:
+                        if not deal.get("Neighborhood"):
+                            carried = prior.get(deal.get("Deal_Name"))
+                            if carried:
+                                deal["Neighborhood"] = carried
+            except Exception as e:
+                logger.warning(f"Could not carry forward neighborhoods: {e}")
+
         cache_data = {
             "timestamp": datetime.now().isoformat(),
             "deals": deals,
@@ -64,32 +126,43 @@ class NeighboringProjectsManager:
         try:
             with open(self.cache_file, 'w') as f:
                 json.dump(cache_data, f, indent=2)
-            logger.info(f"Saved {len(deals)} deals to cache")
+            tagged = sum(1 for d in deals if d.get("Neighborhood"))
+            logger.info(f"Saved {len(deals)} deals to cache ({tagged} with neighborhood)")
         except Exception as e:
             logger.error(f"Error saving cache: {e}")
 
     def load_cache(self) -> Optional[Dict[str, Any]]:
-        """Load deals from cache file"""
-        if not self.cache_file.exists():
-            logger.info("Cache file does not exist")
+        """Load deals from cache.
+
+        Returns the cached data even when it is past its TTL — a stale cache is
+        far more useful than zero neighboring projects. Staleness is logged and is
+        surfaced separately via :meth:`is_cache_fresh` / :meth:`get_cache_stats`,
+        so callers (e.g. the startup sync) can decide whether to refresh.
+        Returns ``None`` only when the cache is missing or corrupt.
+        """
+        cache_data = self._read_cache_file()
+        if not cache_data:
+            logger.info("Cache file does not exist or is unreadable")
             return None
-        try:
-            with open(self.cache_file, 'r') as f:
-                cache_data = json.load(f)
-            timestamp = datetime.fromisoformat(cache_data["timestamp"])
-            age = datetime.now() - timestamp
-            if age > timedelta(hours=self.cache_ttl_hours):
-                logger.info(f"Cache is stale (age: {age})")
-                return None
-            logger.info(f"Loaded {cache_data['count']} deals from cache (age: {age})")
-            return cache_data
-        except Exception as e:
-            logger.error(f"Error loading cache: {e}")
-            return None
+        age = self._cache_age(cache_data)
+        if age is not None and age > timedelta(hours=self.cache_ttl_hours):
+            logger.warning(
+                f"Cache is stale (age: {age}) — using it anyway; a refresh is recommended"
+            )
+        logger.info(f"Loaded {cache_data.get('count')} deals from cache (age: {age})")
+        return cache_data
+
+    def is_cache_fresh(self) -> bool:
+        """True if the cache exists and is within its TTL."""
+        cache_data = self._read_cache_file()
+        if not cache_data:
+            return False
+        age = self._cache_age(cache_data)
+        return age is not None and age <= timedelta(hours=self.cache_ttl_hours)
 
     def is_cache_valid(self) -> bool:
-        """Check if cache exists and is still valid"""
-        return self.load_cache() is not None
+        """Backwards-compatible alias for :meth:`is_cache_fresh`."""
+        return self.is_cache_fresh()
 
     def find_neighboring_projects(self, target_address: str,
                                  target_neighborhood: str = None,
@@ -115,19 +188,18 @@ class NeighboringProjectsManager:
 
         deals = cache_data.get("deals", [])
 
-        # Determine target neighborhood
-        # Always do ZIP-based lookup for consistency with our cache
+        # Determine the target neighborhood via the same ZIP-based table used to
+        # tag the cached deals, so both sides share one vocabulary.
         zip_neighborhood = None
-        try:
-            from nyc_neighborhoods import get_neighborhood_from_address
-            zip_neighborhood = get_neighborhood_from_address(target_address, use_geocoding=False)
-        except ImportError:
+        if get_neighborhood_from_address is not None:
             try:
-                # Try relative import path when running from project root
-                from pre_walkthrough_generator.src.nyc_neighborhoods import get_neighborhood_from_address
                 zip_neighborhood = get_neighborhood_from_address(target_address, use_geocoding=False)
-            except ImportError:
-                pass
+            except Exception as e:
+                logger.error(f"Neighborhood lookup failed for {target_address}: {e}")
+        else:
+            logger.warning(
+                "nyc_neighborhoods unavailable — falling back to same-building matching only"
+            )
 
         # Use ZIP-based neighborhood as primary (matches our cache),
         # fall back to provided neighborhood from API

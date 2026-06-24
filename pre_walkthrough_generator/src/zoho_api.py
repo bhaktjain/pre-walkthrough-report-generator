@@ -46,10 +46,16 @@ class ZohoAPI:
             response.raise_for_status()
             data = response.json()
             
-            self.access_token = data["access_token"]
-            # Zoho tokens typically expire in 1 hour
-            expires_in = data.get("expires_in", 3600)
-            self.token_expires_at = datetime.now() + timedelta(seconds=expires_in - 300)  # 5 min buffer
+            self.access_token = data.get("access_token")
+            if not self.access_token:
+                raise ValueError("Zoho token response did not include an access_token")
+            # Zoho tokens typically expire in 1 hour. Coerce defensively and never
+            # let the buffer push the expiry into the past.
+            try:
+                expires_in = int(data.get("expires_in", 3600))
+            except (TypeError, ValueError):
+                expires_in = 3600
+            self.token_expires_at = datetime.now() + timedelta(seconds=max(0, expires_in - 300))  # 5 min buffer
             
             logger.info("Zoho access token refreshed successfully")
             return self.access_token
@@ -174,6 +180,8 @@ class ZohoAPI:
         Returns:
             List of project records
         """
-        # This will be customized based on your Zoho field structure
-        criteria = f"(Neighborhood:equals:{neighborhood})"
+        # Sanitize the value so characters that are significant in COQL criteria
+        # (parentheses, colons) can't break the query syntax.
+        safe = str(neighborhood).replace('(', ' ').replace(')', ' ').replace(':', ' ').strip()
+        criteria = f"(Neighborhood:equals:{safe})"
         return self.search_records(module_name, criteria)
