@@ -1,12 +1,1548 @@
 {
-  "timestamp": "2026-06-24T15:38:19.063123",
+  "timestamp": "2026-06-24T17:04:20.748000",
   "deals": [
+    {
+      "Deal_Name": "400 East 77th Street #1H",
+      "Amount": 178500,
+      "Stage": "Proposal sent",
+      "id": "4981506000108333002",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Angela Grant",
+        "id": "4981506000106170668"
+      },
+      "Neighborhood": "Upper East Side"
+    },
+    {
+      "Deal_Name": "1763 Espanola Dr",
+      "Amount": 750955,
+      "Stage": "WARM",
+      "id": "4981506000108301016",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Yoel Tapanes",
+        "id": "4981506000107301073"
+      },
+      "Neighborhood": "Coconut Grove"
+    },
+    {
+      "Deal_Name": "10 West 15th Street #316",
+      "Amount": 185600,
+      "Stage": "WARM",
+      "id": "4981506000108243025",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Tobias Silverstein",
+        "id": "4981506000107565036"
+      },
+      "Neighborhood": "Chelsea"
+    },
+    {
+      "Deal_Name": "14 East 4th Street #503",
+      "Amount": 225500,
+      "Stage": "WARM",
+      "id": "4981506000108169010",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Jaehee Har",
+        "id": "4981506000106618064"
+      },
+      "Neighborhood": "East Village"
+    },
+    {
+      "Deal_Name": "35 Sutton Place #7B",
+      "Amount": 203890,
+      "Stage": "WARM",
+      "id": "4981506000108070010",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Paul Reilly",
+        "id": "4981506000106170183"
+      },
+      "Neighborhood": "Midtown East"
+    },
+    {
+      "Deal_Name": "2672 John F. Kennedy Boulevard #403",
+      "Amount": 79890,
+      "Stage": "WARM",
+      "id": "4981506000108035003",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Jason Campbell",
+        "id": "4981506000107565148"
+      },
+      "Neighborhood": "Financial District"
+    },
+    {
+      "Deal_Name": "209 Washington Street #3",
+      "Amount": 78780,
+      "Stage": "Proposal sent",
+      "id": "4981506000107877013",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Jewon Yu",
+        "id": "4981506000104929007"
+      },
+      "Neighborhood": "West Village"
+    },
+    {
+      "Deal_Name": "495 Brickell Ave #5011",
+      "Amount": 195139,
+      "Stage": "Closed Lost",
+      "id": "4981506000107861009",
+      "Closing_Date": "2026-06-23",
+      "Contact_Name": {
+        "name": "Jason Divito",
+        "id": "4981506000107010073"
+      },
+      "Neighborhood": "Brickell"
+    },
+    {
+      "Deal_Name": "150 Mercer Street",
+      "Amount": 152535,
+      "Stage": "WARM",
+      "id": "4981506000107644002",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Monica Nazario",
+        "id": "4981506000106346504"
+      },
+      "Neighborhood": "SoHo"
+    },
+    {
+      "Deal_Name": "1150 Park Avenue #12F",
+      "Amount": 310000,
+      "Stage": "HOT",
+      "id": "4981506000107314002",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Michelle Fikrig",
+        "id": "4981506000106354146"
+      },
+      "Neighborhood": "Upper East Side"
+    },
+    {
+      "Deal_Name": "262 Central Park West #2D",
+      "Amount": 531000,
+      "Stage": "COLD",
+      "id": "4981506000107241006",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Nicholas Cataldo",
+        "id": "4981506000106072707"
+      },
+      "Neighborhood": "Upper West Side"
+    },
+    {
+      "Deal_Name": "28 West 128th Street",
+      "Amount": 960000,
+      "Stage": "COLD",
+      "id": "4981506000107180002",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Mike Cummings",
+        "id": "4981506000105854030"
+      },
+      "Neighborhood": "Harlem"
+    },
+    {
+      "Deal_Name": "323 15th Street",
+      "Amount": 690500,
+      "Stage": "Closed Lost",
+      "id": "4981506000107130006",
+      "Closing_Date": "2026-06-23",
+      "Contact_Name": {
+        "name": "Wendy Kong",
+        "id": "4981506000106170296"
+      },
+      "Neighborhood": "Park Slope"
+    },
+    {
+      "Deal_Name": "200 Biscayne Boulevard Way #4801",
+      "Amount": 371275,
+      "Stage": "WARM",
+      "id": "4981506000106994019",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Jordan Boslego",
+        "id": "4981506000105637024"
+      },
+      "Neighborhood": "Brickell"
+    },
+    {
+      "Deal_Name": "1247 Anastasia Ave",
+      "Amount": 687070,
+      "Stage": "COLD",
+      "id": "4981506000106766003",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Alessandra Doinger",
+        "id": "4981506000105303598"
+      },
+      "Neighborhood": "Coral Gables"
+    },
+    {
+      "Deal_Name": "30-40 Hobart Street",
+      "Amount": 710409,
+      "Stage": "HOT",
+      "id": "4981506000106736005",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Spencer Barrett",
+        "id": "4981506000104871385"
+      },
+      "Neighborhood": "Woodside"
+    },
+    {
+      "Deal_Name": "124 Sheldon Street",
+      "Amount": 227135,
+      "Stage": "WARM",
+      "id": "4981506000106734004",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Ginger Shukrun",
+        "id": "4981506000104532001"
+      },
+      "Neighborhood": "Village of Middleburgh"
+    },
+    {
+      "Deal_Name": "8375 Southwest 89th Street",
+      "Amount": 352103.55,
+      "Stage": "Closed Lost",
+      "id": "4981506000106615004",
+      "Closing_Date": "2026-06-22",
+      "Contact_Name": {
+        "name": "Ellie Edgar",
+        "id": "4981506000086979711"
+      },
+      "Neighborhood": "Pinecrest"
+    },
+    {
+      "Deal_Name": "335 Greenwich Street #2/3C",
+      "Amount": 135600,
+      "Stage": "WARM",
+      "id": "4981506000106602005",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Allie Golden",
+        "id": "4981506000104140434"
+      },
+      "Neighborhood": "Tribeca"
+    },
+    {
+      "Deal_Name": "5 Eastern Drive",
+      "Amount": 79720,
+      "Stage": "WARM",
+      "id": "4981506000106562007",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Joella Jones",
+        "id": "4981506000105854084"
+      },
+      "Neighborhood": "Ardsley"
+    },
+    {
+      "Deal_Name": "900 Biscayne Blvd #2308",
+      "Amount": 162687.5,
+      "Stage": "WARM",
+      "id": "4981506000106435015",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Christian Izquierdo",
+        "id": "4981506000105410305"
+      },
+      "Neighborhood": "Downtown Miami"
+    },
+    {
+      "Deal_Name": "90-14 218th Street",
+      "Amount": 440500,
+      "Stage": "WARM",
+      "id": "4981506000106264036",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Marcella Kocolatos",
+        "id": "4981506000104254023"
+      },
+      "Neighborhood": "Queens Village"
+    },
+    {
+      "Deal_Name": "166 East 78th Street #2B",
+      "Amount": 283505,
+      "Stage": "COLD",
+      "id": "4981506000106233004",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Christopher Palmer",
+        "id": "4981506000105303535"
+      },
+      "Neighborhood": "Upper East Side"
+    },
+    {
+      "Deal_Name": "40 Lookout Circle",
+      "Amount": 287570,
+      "Stage": "Closed Won",
+      "id": "4981506000106182038",
+      "Closing_Date": "2026-06-13",
+      "Contact_Name": {
+        "name": "Daniel Phan",
+        "id": "4981506000104526135"
+      },
+      "Neighborhood": "Larchmont"
+    },
+    {
+      "Deal_Name": "201 West 70th Street #12L",
+      "Amount": 135500,
+      "Stage": "COLD",
+      "id": "4981506000106173010",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Emma Messen",
+        "id": "4981506000105917007"
+      },
+      "Neighborhood": "Upper West Side"
+    },
+    {
+      "Deal_Name": "68-10 Ingram Street",
+      "Amount": 855600,
+      "Stage": "WARM",
+      "id": "4981506000106172012",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Erica Goldberger",
+        "id": "4981506000104665076"
+      },
+      "Neighborhood": "Forest Hills"
+    },
+    {
+      "Deal_Name": "50 East 89th Street #19B",
+      "Amount": 178500,
+      "Stage": "WARM",
+      "id": "4981506000106101008",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Daniel Androuin",
+        "id": "4981506000105504019"
+      },
+      "Neighborhood": "Upper East Side"
+    },
+    {
+      "Deal_Name": "3455 S Moorings Way",
+      "Amount": 171690,
+      "Stage": "Closed Lost",
+      "id": "4981506000105945010",
+      "Closing_Date": "2026-06-24",
+      "Contact_Name": {
+        "name": "Gabriel Fort",
+        "id": "4981506000105410438"
+      },
+      "Neighborhood": null
+    },
+    {
+      "Deal_Name": "10889 Southwest 149th Place",
+      "Amount": 317035,
+      "Stage": "Closed Lost",
+      "id": "4981506000105943008",
+      "Closing_Date": "2026-06-01",
+      "Contact_Name": {
+        "name": "Ernest Jutte",
+        "id": "4981506000103783233"
+      },
+      "Neighborhood": "Kendall"
+    },
+    {
+      "Deal_Name": "225 East 47th Street",
+      "Amount": 188490,
+      "Stage": "COLD",
+      "id": "4981506000105866002",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Walter Hartnett",
+        "id": "4981506000104140082"
+      },
+      "Neighborhood": "Midtown East"
+    },
+    {
+      "Deal_Name": "417 Grand Street #D605",
+      "Amount": 115200,
+      "Stage": "COLD",
+      "id": "4981506000105739004",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Sonya Chung",
+        "id": "4981506000104785021"
+      },
+      "Neighborhood": "Williamsburg"
+    },
+    {
+      "Deal_Name": "151 East 85th Street #11J",
+      "Amount": 205500,
+      "Stage": "COLD",
+      "id": "4981506000105681020",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Shalabh Garg",
+        "id": "4981506000104871318"
+      },
+      "Neighborhood": "Upper East Side"
+    },
+    {
+      "Deal_Name": "340 East 72nd Street #2N",
+      "Amount": 245600,
+      "Stage": "COLD",
+      "id": "4981506000105662025",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Emily Penn",
+        "id": "4981506000104254099"
+      },
+      "Neighborhood": "Upper East Side"
+    },
+    {
+      "Deal_Name": "88 Chambers Street",
+      "Amount": 130690,
+      "Stage": "Closed Won",
+      "id": "4981506000105639037",
+      "Closing_Date": "2026-05-30",
+      "Contact_Name": {
+        "name": "Sakshi Jain",
+        "id": "4981506000104375523"
+      },
+      "Neighborhood": "Tribeca"
+    },
+    {
+      "Deal_Name": "300 West 53rd Street #6H",
+      "Amount": 225500,
+      "Stage": "COLD",
+      "id": "4981506000105639012",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Viv Chen",
+        "id": "4981506000104140944"
+      },
+      "Neighborhood": "Midtown West"
+    },
+    {
+      "Deal_Name": "54 Lawrence Avenue",
+      "Amount": 584609,
+      "Stage": "COLD",
+      "id": "4981506000105461010",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Emiko Niesi",
+        "id": "4981506000103659304"
+      },
+      "Neighborhood": "Lawrence"
+    },
+    {
+      "Deal_Name": "10 The Esplanade",
+      "Amount": 200427,
+      "Stage": "WARM",
+      "id": "4981506000105401005",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Aika Adysheva",
+        "id": "4981506000104375226"
+      },
+      "Neighborhood": "Rochelle Heights"
+    },
+    {
+      "Deal_Name": "245 East 61st Street",
+      "Amount": 2300077,
+      "Stage": "Closed Lost",
+      "id": "4981506000105399009",
+      "Closing_Date": "2026-05-27",
+      "Contact_Name": {
+        "name": "Matthew Caltabiano",
+        "id": "4981506000103140233"
+      },
+      "Neighborhood": "Upper East Side"
+    },
+    {
+      "Deal_Name": "8235 NW 156th Terrace",
+      "Amount": 192770,
+      "Stage": "Closed Lost",
+      "id": "4981506000105085025",
+      "Closing_Date": "2026-06-04",
+      "Contact_Name": {
+        "name": "Andy Mendez",
+        "id": "4981506000103590004"
+      },
+      "Neighborhood": "Hialeah"
+    },
+    {
+      "Deal_Name": "1871 Southwest 21st Terrace",
+      "Amount": 172068,
+      "Stage": "Closed Lost",
+      "id": "4981506000105075020",
+      "Closing_Date": "2026-06-09",
+      "Contact_Name": {
+        "name": "Francisco Badiola",
+        "id": "4981506000103937783"
+      },
+      "Neighborhood": "Shenandoah"
+    },
+    {
+      "Deal_Name": "68 Birch Lane",
+      "Amount": 65500,
+      "Stage": "COLD",
+      "id": "4981506000105072029",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Marisa Zullin",
+        "id": "4981506000103509685"
+      },
+      "Neighborhood": "Port Chester"
+    },
+    {
+      "Deal_Name": "2370 Southwest 5th Street",
+      "Amount": 189372,
+      "Stage": "Closed Lost",
+      "id": "4981506000105064002",
+      "Closing_Date": "2026-06-09",
+      "Contact_Name": {
+        "name": "Adam Hendel",
+        "id": "4981506000103783199"
+      },
+      "Neighborhood": "Little Havana"
+    },
+    {
+      "Deal_Name": "235 East 49th Street #6BC",
+      "Amount": 126500,
+      "Stage": "Closed Lost",
+      "id": "4981506000104941002",
+      "Closing_Date": "2026-06-23",
+      "Contact_Name": {
+        "name": "Romany Webb",
+        "id": "4981506000103943027"
+      },
+      "Neighborhood": "Midtown East"
+    },
+    {
+      "Deal_Name": "6103 Aqua Ave #702",
+      "Amount": 186370,
+      "Stage": "Closed Lost",
+      "id": "4981506000104920009",
+      "Closing_Date": "2026-06-10",
+      "Contact_Name": {
+        "name": "Angie Herbers",
+        "id": "4981506000104140649"
+      },
+      "Neighborhood": null
+    },
+    {
+      "Deal_Name": "808 Broadway #PHA",
+      "Amount": 177500,
+      "Stage": "Closed Won",
+      "id": "4981506000104868005",
+      "Closing_Date": "2026-05-18",
+      "Contact_Name": {
+        "name": "Frank Taylor",
+        "id": "4981506000104940031"
+      },
+      "Neighborhood": "Union Square"
+    },
+    {
+      "Deal_Name": "132 River Road",
+      "Amount": 144490,
+      "Stage": "WARM",
+      "id": "4981506000104856004",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Uve Kupka",
+        "id": "4981506000103210378"
+      },
+      "Neighborhood": "Briarcliff Manor"
+    },
+    {
+      "Deal_Name": "4 Tompkins Road",
+      "Amount": 166555,
+      "Stage": "Closed Lost",
+      "id": "4981506000104756003",
+      "Closing_Date": "2026-06-08",
+      "Contact_Name": {
+        "name": "Cheng Chang",
+        "id": "4981506000104109104"
+      },
+      "Neighborhood": "Scarsdale"
+    },
+    {
+      "Deal_Name": "300 East 59th Street #2906",
+      "Amount": 212500,
+      "Stage": "COLD",
+      "id": "4981506000104755003",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Ashish Chabria",
+        "id": "4981506000103783425"
+      },
+      "Neighborhood": "Midtown East"
+    },
+    {
+      "Deal_Name": "205 3rd Avenue #5B",
+      "Amount": 99500,
+      "Stage": "Closed Lost",
+      "id": "4981506000104752002",
+      "Closing_Date": "2026-05-18",
+      "Contact_Name": {
+        "name": "Jonathan Konstan-Pines",
+        "id": "4981506000103783455"
+      },
+      "Neighborhood": "East Village"
+    },
+    {
+      "Deal_Name": "10140 West Bay Harbor Drive #601A",
+      "Amount": 198944,
+      "Stage": "Closed Won",
+      "id": "4981506000104418003",
+      "Closing_Date": "2026-05-11",
+      "Contact_Name": {
+        "name": "Chris King",
+        "id": "4981506000103659355"
+      },
+      "Neighborhood": "Bal Harbour"
+    },
+    {
+      "Deal_Name": "149 5th Ave 9th Floor",
+      "Amount": 260232.4,
+      "Stage": "Closed Won",
+      "id": "4981506000104370053",
+      "Closing_Date": "2026-05-11",
+      "Contact_Name": {
+        "name": "Salomon NYC",
+        "id": "4981506000104510110"
+      },
+      "Neighborhood": "Flatiron"
+    },
+    {
+      "Deal_Name": "11 Island Avenue #1410",
+      "Amount": 220735,
+      "Stage": "Closed Lost",
+      "id": "4981506000104367018",
+      "Closing_Date": "2026-06-10",
+      "Contact_Name": {
+        "name": "Carolina Alvarez",
+        "id": "4981506000104140619"
+      },
+      "Neighborhood": "Coney Island"
+    },
+    {
+      "Deal_Name": "50 East 79th Street #2D",
+      "Amount": 219500,
+      "Stage": "Closed Lost",
+      "id": "4981506000104165017",
+      "Closing_Date": "2026-05-20",
+      "Contact_Name": {
+        "name": "Oran Eldor",
+        "id": "4981506000103943070"
+      },
+      "Neighborhood": "Upper East Side"
+    },
+    {
+      "Deal_Name": "14 West 87th Street #6",
+      "Amount": 436812,
+      "Stage": "Closed Won",
+      "id": "4981506000104093024",
+      "Closing_Date": "2026-06-03",
+      "Contact_Name": {
+        "name": "Alex Le Roux",
+        "id": "4981506000102578217"
+      },
+      "Neighborhood": "Upper West Side"
+    },
+    {
+      "Deal_Name": "219 SW 23rd Road",
+      "Amount": 320906,
+      "Stage": "Closed Lost",
+      "id": "4981506000104082004",
+      "Closing_Date": "2026-06-12",
+      "Contact_Name": {
+        "name": "Josh Ketellapper",
+        "id": "4981506000060834433"
+      },
+      "Neighborhood": "Brickell"
+    },
+    {
+      "Deal_Name": "7921 Byron Ave #407",
+      "Amount": 184255,
+      "Stage": "Closed Lost",
+      "id": "4981506000104081002",
+      "Closing_Date": "2026-06-09",
+      "Contact_Name": {
+        "name": "Dwight Gorden",
+        "id": "4981506000103210035"
+      },
+      "Neighborhood": "Wakefield"
+    },
+    {
+      "Deal_Name": "155 Revolutionary Rd",
+      "Amount": 209460,
+      "Stage": "COLD",
+      "id": "4981506000103921017",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Ankita Brahmaroutu",
+        "id": "4981506000102578423"
+      },
+      "Neighborhood": "Briarcliff Manor"
+    },
+    {
+      "Deal_Name": "328 Clinton Avenue #1",
+      "Amount": 100500,
+      "Stage": "Closed Lost",
+      "id": "4981506000103835025",
+      "Closing_Date": "2026-06-16",
+      "Contact_Name": {
+        "name": "Emma Hyde",
+        "id": "4981506000101114921"
+      },
+      "Neighborhood": "Clinton Hill"
+    },
+    {
+      "Deal_Name": "2240 Tequesta Lane",
+      "Amount": 474550,
+      "Stage": "Closed Won",
+      "id": "4981506000103672009",
+      "Closing_Date": "2026-05-08",
+      "Contact_Name": {
+        "name": "Carlos Oglesby",
+        "id": "4981506000103176418"
+      },
+      "Neighborhood": "Coconut Grove"
+    },
+    {
+      "Deal_Name": "609 West 114th Street #54",
+      "Amount": 143879,
+      "Stage": "Closed Lost",
+      "id": "4981506000103670014",
+      "Closing_Date": "2026-05-18",
+      "Contact_Name": {
+        "name": "Malia Mason",
+        "id": "4981506000103398080"
+      },
+      "Neighborhood": "Harlem"
+    },
+    {
+      "Deal_Name": "601 Northeast 27 Street #1801",
+      "Amount": 82155.6,
+      "Stage": "Closed Lost",
+      "id": "4981506000103669013",
+      "Closing_Date": "2026-06-17",
+      "Contact_Name": {
+        "name": "Jose Luis Lobron",
+        "id": "4981506000103067214"
+      },
+      "Neighborhood": null
+    },
+    {
+      "Deal_Name": "54 Orange St #6B",
+      "Amount": 166240,
+      "Stage": "Closed Won",
+      "id": "4981506000103666021",
+      "Closing_Date": "2026-05-14",
+      "Contact_Name": {
+        "name": "Lynn Cho",
+        "id": "4981506000103188585"
+      },
+      "Neighborhood": "Brooklyn Heights"
+    },
+    {
+      "Deal_Name": "271 West 122nd Street #A",
+      "Amount": 114090,
+      "Stage": "Closed Won",
+      "id": "4981506000103522006",
+      "Closing_Date": "2026-05-08",
+      "Contact_Name": {
+        "name": "Justina Avila-Rieger",
+        "id": "4981506000102948360"
+      },
+      "Neighborhood": "Harlem"
+    },
+    {
+      "Deal_Name": "101 Clark Street #10E",
+      "Amount": 125400,
+      "Stage": "Closed Lost",
+      "id": "4981506000103302014",
+      "Closing_Date": "2026-05-26",
+      "Contact_Name": {
+        "name": "Darryl Bobb",
+        "id": "4981506000101776054"
+      },
+      "Neighborhood": "Hudson"
+    },
+    {
+      "Deal_Name": "31 Parcot Avenue",
+      "Amount": 108185,
+      "Stage": "COLD",
+      "id": "4981506000103292071",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Thatcher Woodley",
+        "id": "4981506000102386116"
+      },
+      "Neighborhood": "New Rochelle"
+    },
+    {
+      "Deal_Name": "70 East 10th Street #PHD",
+      "Amount": 107880,
+      "Stage": "Closed Lost",
+      "id": "4981506000103269070",
+      "Closing_Date": "2026-05-10",
+      "Contact_Name": {
+        "name": "Steph Simonidis",
+        "id": "4981506000102394738"
+      },
+      "Neighborhood": "East Village"
+    },
+    {
+      "Deal_Name": "5 East 22nd Street #16P",
+      "Amount": 249325,
+      "Stage": "Closed Won",
+      "id": "4981506000103268002",
+      "Closing_Date": "2026-06-19",
+      "Contact_Name": {
+        "name": "Priya Lawrence",
+        "id": "4981506000102701214"
+      },
+      "Neighborhood": "Kips Bay"
+    },
+    {
+      "Deal_Name": "6000 Island Boulevard #1007",
+      "Amount": 315460,
+      "Stage": "Closed Won",
+      "id": "4981506000103228139",
+      "Closing_Date": "2026-06-03",
+      "Contact_Name": {
+        "name": "Jonathan Maya",
+        "id": "4981506000103067315"
+      },
+      "Neighborhood": null
+    },
+    {
+      "Deal_Name": "130 Beekman Street #4A",
+      "Amount": 342420,
+      "Stage": "Closed Won",
+      "id": "4981506000103226012",
+      "Closing_Date": "2026-06-20",
+      "Contact_Name": {
+        "name": "Jason Vasquez",
+        "id": "4981506000102317206"
+      },
+      "Neighborhood": "Midtown East"
+    },
+    {
+      "Deal_Name": "60 Old Lyme Road",
+      "Amount": 388657,
+      "Stage": "Closed Lost",
+      "id": "4981506000103219098",
+      "Closing_Date": "2026-05-15",
+      "Contact_Name": {
+        "name": "Michael Savino",
+        "id": "4981506000100149605"
+      },
+      "Neighborhood": "Chappaqua"
+    },
+    {
+      "Deal_Name": "18462 Southwest 130th Avenue",
+      "Amount": 186675,
+      "Stage": "Closed Lost",
+      "id": "4981506000103056026",
+      "Closing_Date": "2026-04-07",
+      "Contact_Name": {
+        "name": "Beatriz Ching",
+        "id": "4981506000098795523"
+      },
+      "Neighborhood": "Homestead"
+    },
+    {
+      "Deal_Name": "4410 Southwest 13th Street",
+      "Amount": 80502.5,
+      "Stage": "Closed Lost",
+      "id": "4981506000103052021",
+      "Closing_Date": "2026-06-01",
+      "Contact_Name": {
+        "name": "Cristina Touzet",
+        "id": "4981506000099846073"
+      },
+      "Neighborhood": "Coral Gables"
+    },
+    {
+      "Deal_Name": "19 Erli Street",
+      "Amount": 385660,
+      "Stage": "Closed Lost",
+      "id": "4981506000103043136",
+      "Closing_Date": "2026-04-28",
+      "Contact_Name": {
+        "name": "Page Perkinson",
+        "id": "4981506000102386001"
+      },
+      "Neighborhood": "Packanack Lake"
+    },
+    {
+      "Deal_Name": "9 Hayes Drive",
+      "Amount": 236657,
+      "Stage": "Closed Lost",
+      "id": "4981506000103041030",
+      "Closing_Date": "2026-05-15",
+      "Contact_Name": {
+        "name": "David Viviano",
+        "id": "4981506000101208549"
+      },
+      "Neighborhood": "Eastchester"
+    },
+    {
+      "Deal_Name": "971 Northeast 115th Street",
+      "Amount": 231237.3,
+      "Stage": "COLD",
+      "id": "4981506000103033020",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Grant Burger",
+        "id": "4981506000099238539"
+      },
+      "Neighborhood": "North Miami"
+    },
+    {
+      "Deal_Name": "250 East 54th Street #35A",
+      "Amount": 231885,
+      "Stage": "Closed Won",
+      "id": "4981506000102615019",
+      "Closing_Date": "2026-04-27",
+      "Contact_Name": {
+        "name": "Helen Korte",
+        "id": "4981506000101271483"
+      },
+      "Neighborhood": "Midtown East"
+    },
+    {
+      "Deal_Name": "205 3rd Avenue #15N",
+      "Amount": 131888,
+      "Stage": "Closed Lost",
+      "id": "4981506000102603037",
+      "Closing_Date": "2026-06-03",
+      "Contact_Name": {
+        "name": "Amanda Paret",
+        "id": "4981506000101531033"
+      },
+      "Neighborhood": "East Village"
+    },
+    {
+      "Deal_Name": "2110 Frederick Douglass Blvd #8C",
+      "Amount": 370220,
+      "Stage": "COLD",
+      "id": "4981506000102600029",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Behnoosh Amirimani",
+        "id": "4981506000101531517"
+      },
+      "Neighborhood": "Harlem"
+    },
+    {
+      "Deal_Name": "540 Brickell Key Dr #1709",
+      "Amount": 121230,
+      "Stage": "Closed Lost",
+      "id": "4981506000102500019",
+      "Closing_Date": "2026-05-06",
+      "Contact_Name": {
+        "name": "Luz Haratyk",
+        "id": "4981506000102386912"
+      },
+      "Neighborhood": "Brickell"
+    },
+    {
+      "Deal_Name": "310 West 72nd Street #3AB",
+      "Amount": 255400,
+      "Stage": "COLD",
+      "id": "4981506000102324028",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Barry Strongin",
+        "id": "4981506000097749228"
+      },
+      "Neighborhood": "Upper West Side"
+    },
+    {
+      "Deal_Name": "185 West Houston St #3J",
+      "Amount": 117370,
+      "Stage": "Closed Won",
+      "id": "4981506000102322042",
+      "Closing_Date": "2026-04-27",
+      "Contact_Name": {
+        "name": "Sydney Packard",
+        "id": "4981506000101046079"
+      },
+      "Neighborhood": "SoHo"
+    },
+    {
+      "Deal_Name": "55 West 95th Street #812",
+      "Amount": 124541,
+      "Stage": "Closed Lost",
+      "id": "4981506000102242066",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Daniel Sullivan",
+        "id": "4981506000100866587"
+      },
+      "Neighborhood": "Upper West Side"
+    },
+    {
+      "Deal_Name": "520 West 45th Street #2B",
+      "Amount": 160500,
+      "Stage": "Closed Lost",
+      "id": "4981506000102239043",
+      "Closing_Date": "2026-04-21",
+      "Contact_Name": {
+        "name": "Ravi Jain",
+        "id": "4981506000101208158"
+      },
+      "Neighborhood": "Midtown West"
+    },
+    {
+      "Deal_Name": "642 Washington Street #4B",
+      "Amount": 265600,
+      "Stage": "Closed Lost",
+      "id": "4981506000102225056",
+      "Closing_Date": "2026-05-04",
+      "Contact_Name": {
+        "name": "Seth Merkin Morokoff",
+        "id": "4981506000100822411"
+      },
+      "Neighborhood": "West Village"
+    },
+    {
+      "Deal_Name": "1240 Northeast 93rd Street",
+      "Amount": 93375,
+      "Stage": "Closed Lost",
+      "id": "4981506000102224056",
+      "Closing_Date": "2026-04-28",
+      "Contact_Name": {
+        "name": "Nicholas Kolesar",
+        "id": "4981506000101723176"
+      },
+      "Neighborhood": "Upper East Side Miami"
+    },
+    {
+      "Deal_Name": "1196 Metropolitan Avenue #1D",
+      "Amount": 125120,
+      "Stage": "Closed Lost",
+      "id": "4981506000101670016",
+      "Closing_Date": "2026-05-04",
+      "Contact_Name": {
+        "name": "Daniel Shindle",
+        "id": "4981506000098392233"
+      },
+      "Neighborhood": "Williamsburg"
+    },
+    {
+      "Deal_Name": "174 Washington Street #3F",
+      "Amount": 77925,
+      "Stage": "Closed Won",
+      "id": "4981506000101579002",
+      "Closing_Date": "2026-04-26",
+      "Contact_Name": {
+        "name": "Justin Patrie",
+        "id": "4981506000099238074"
+      },
+      "Neighborhood": "West Village"
+    },
+    {
+      "Deal_Name": "600 Manville Road",
+      "Amount": 103000,
+      "Stage": "Closed Lost",
+      "id": "4981506000101544009",
+      "Closing_Date": "2026-04-10",
+      "Contact_Name": {
+        "name": "Julie Horowitz",
+        "id": "4981506000099550230"
+      },
+      "Neighborhood": "Pleasantville"
+    },
+    {
+      "Deal_Name": "32 West 39th Street",
+      "Amount": 119785,
+      "Stage": "Closed Lost",
+      "id": "4981506000101515016",
+      "Closing_Date": "2026-05-11",
+      "Contact_Name": {
+        "name": "Bryan Wierzbicki",
+        "id": "4981506000099171416"
+      },
+      "Neighborhood": "Chelsea"
+    },
+    {
+      "Deal_Name": "129 Finlay St",
+      "Amount": 398600,
+      "Stage": "Closed Won",
+      "id": "4981506000101442006",
+      "Closing_Date": "2026-04-03",
+      "Contact_Name": {
+        "name": "Francesca DiIorio",
+        "id": "4981506000099436761"
+      },
+      "Neighborhood": "Tottenville"
+    },
+    {
+      "Deal_Name": "516 East 78th Street #2L",
+      "Amount": 135244,
+      "Stage": "Closed Won",
+      "id": "4981506000100821027",
+      "Closing_Date": "2026-03-28",
+      "Contact_Name": {
+        "name": "Jeffrey Orlowski",
+        "id": "4981506000098707163"
+      },
+      "Neighborhood": "Upper East Side"
+    },
+    {
+      "Deal_Name": "23 Maplewood Dr",
+      "Amount": 189500,
+      "Stage": "Closed Lost",
+      "id": "4981506000100819045",
+      "Closing_Date": "2026-03-31",
+      "Contact_Name": {
+        "name": "Olivia Chan Tim",
+        "id": "4981506000048144306"
+      },
+      "Neighborhood": "Bellport"
+    },
+    {
+      "Deal_Name": "333 East 80th Street #5H",
+      "Amount": 121040,
+      "Stage": "Closed Lost",
+      "id": "4981506000100771086",
+      "Closing_Date": "2026-06-03",
+      "Contact_Name": {
+        "name": "Rafiq Sitabkhan",
+        "id": "4981506000099136333"
+      },
+      "Neighborhood": "Upper East Side"
+    },
+    {
+      "Deal_Name": "663 Ackerman Avenue",
+      "Amount": 78870,
+      "Stage": "Closed Lost",
+      "id": "4981506000100768075",
+      "Closing_Date": "2026-05-06",
+      "Contact_Name": {
+        "name": "Janice Kim",
+        "id": "4981506000095593015"
+      },
+      "Neighborhood": "University Neighborhood"
+    },
+    {
+      "Deal_Name": "2068 28th Street",
+      "Amount": 186165,
+      "Stage": "Closed Lost",
+      "id": "4981506000100742100",
+      "Closing_Date": "2026-04-14",
+      "Contact_Name": {
+        "name": "Kevin Johnson",
+        "id": "4981506000099436388"
+      },
+      "Neighborhood": "Sunset Park"
+    },
+    {
+      "Deal_Name": "360 East 72nd Street #C2202",
+      "Amount": 200908.5,
+      "Stage": "Closed Lost",
+      "id": "4981506000100738082",
+      "Closing_Date": "2026-04-09",
+      "Contact_Name": {
+        "name": "Zeina Abdul Samad",
+        "id": "4981506000099136422"
+      },
+      "Neighborhood": "Upper East Side"
+    },
+    {
+      "Deal_Name": "24 Avenue at Port Imperial #324",
+      "Amount": 67635,
+      "Stage": "COLD",
+      "id": "4981506000100611023",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Emily Chow",
+        "id": "4981506000095999879"
+      },
+      "Neighborhood": "West New York"
+    },
+    {
+      "Deal_Name": "250 East 53rd Street #3101",
+      "Amount": 135600,
+      "Stage": "Closed Lost",
+      "id": "4981506000100477024",
+      "Closing_Date": "2026-04-21",
+      "Contact_Name": {
+        "name": "Alona Wesley",
+        "id": "4981506000098066874"
+      },
+      "Neighborhood": "Midtown East"
+    },
+    {
+      "Deal_Name": "512 2nd Street Apt 1A",
+      "Amount": 29035,
+      "Stage": "Closed Lost",
+      "id": "4981506000100374002",
+      "Closing_Date": "2026-04-14",
+      "Contact_Name": {
+        "name": "Alyssa Nowicky",
+        "id": "4981506000099171018"
+      },
+      "Neighborhood": "Park Slope"
+    },
+    {
+      "Deal_Name": "40 East 9th Street #7D",
+      "Amount": 256500,
+      "Stage": "Closed Lost",
+      "id": "4981506000100341010",
+      "Closing_Date": "2026-04-13",
+      "Contact_Name": {
+        "name": "Chloe Gura",
+        "id": "4981506000096543465"
+      },
+      "Neighborhood": "East Village"
+    },
+    {
+      "Deal_Name": "46 Sussex Road",
+      "Amount": 70500,
+      "Stage": "Closed Lost",
+      "id": "4981506000100099029",
+      "Closing_Date": "2026-04-10",
+      "Contact_Name": {
+        "name": "Samantha Lopez",
+        "id": "4981506000096543862"
+      },
+      "Neighborhood": "Elmont"
+    },
+    {
+      "Deal_Name": "240 East 47th Street #25C",
+      "Amount": 126515,
+      "Stage": "Closed Lost",
+      "id": "4981506000100091044",
+      "Closing_Date": "2026-05-10",
+      "Contact_Name": {
+        "name": "Joseph Moshkovsk",
+        "id": "4981506000098795308"
+      },
+      "Neighborhood": "Midtown East"
+    },
+    {
+      "Deal_Name": "51 3rd Street",
+      "Amount": 151500,
+      "Stage": "COLD",
+      "id": "4981506000100034037",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Sean Tucker",
+        "id": "4981506000096338772"
+      },
+      "Neighborhood": "Park Slope"
+    },
+    {
+      "Deal_Name": "50 E Hartsdale Ave #7H",
+      "Amount": 189500,
+      "Stage": "COLD",
+      "id": "4981506000099920022",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Kathleen Turajane",
+        "id": "4981506000098587687"
+      },
+      "Neighborhood": "Hartsdale"
+    },
+    {
+      "Deal_Name": "20-56 26th Street",
+      "Amount": 135000,
+      "Stage": "Proposal sent",
+      "id": "4981506000099674004",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Brandon Budelman",
+        "id": "4981506000098869195"
+      },
+      "Neighborhood": "Long Island City"
+    },
+    {
+      "Deal_Name": "64 Independence Way",
+      "Amount": 69735,
+      "Stage": "COLD",
+      "id": "4981506000099651050",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "M\u00f3nica Cristancho",
+        "id": "4981506000068859747"
+      },
+      "Neighborhood": "Sound Beach"
+    },
+    {
+      "Deal_Name": "250 East 53rd Street #3101",
+      "Amount": 135600,
+      "Stage": "Closed Lost",
+      "id": "4981506000099626045",
+      "Closing_Date": "2026-03-24",
+      "Contact_Name": {
+        "name": "Alona Wesley",
+        "id": "4981506000098066874"
+      },
+      "Neighborhood": "Midtown East"
+    },
+    {
+      "Deal_Name": "3300 NE 188th St #812",
+      "Amount": 233730,
+      "Stage": "Closed Lost",
+      "id": "4981506000099622033",
+      "Closing_Date": "2026-06-09",
+      "Contact_Name": {
+        "name": "Rogerio Rosa Junior",
+        "id": "4981506000097749770"
+      },
+      "Neighborhood": "Aventura"
+    },
+    {
+      "Deal_Name": "168 Forest Hill Road",
+      "Amount": 42200,
+      "Stage": "Closed Lost",
+      "id": "4981506000099462013",
+      "Closing_Date": "2026-04-14",
+      "Contact_Name": {
+        "name": "Zach Belden",
+        "id": "4981506000098587392"
+      },
+      "Neighborhood": null
+    },
+    {
+      "Deal_Name": "53 Dillon Road",
+      "Amount": 565310,
+      "Stage": "Closed Lost",
+      "id": "4981506000099411002",
+      "Closing_Date": "2026-04-27",
+      "Contact_Name": {
+        "name": "Seth Levy",
+        "id": "4981506000094394882"
+      },
+      "Neighborhood": "Larchmont"
+    },
+    {
+      "Deal_Name": "333 East 30th Street #10P",
+      "Amount": 165500,
+      "Stage": "Closed Lost",
+      "id": "4981506000099310004",
+      "Closing_Date": "2026-04-01",
+      "Contact_Name": {
+        "name": "Natalie Youkel",
+        "id": "4981506000098350086"
+      },
+      "Neighborhood": "Kips Bay"
+    },
+    {
+      "Deal_Name": "5970 Indian Creek Drive #304",
+      "Amount": 217225,
+      "Stage": "Closed Lost",
+      "id": "4981506000099228021",
+      "Closing_Date": "2026-06-24",
+      "Contact_Name": {
+        "name": "Markus Campe",
+        "id": "4981506000098795607"
+      },
+      "Neighborhood": "Miami Beach"
+    },
+    {
+      "Deal_Name": "44 Brookview Terrace",
+      "Amount": 424210,
+      "Stage": "Closed Lost",
+      "id": "4981506000099013032",
+      "Closing_Date": "2026-03-17",
+      "Contact_Name": {
+        "name": "Claude Barnes",
+        "id": "4981506000092681278"
+      },
+      "Neighborhood": "Town of Johnsburg"
+    },
+    {
+      "Deal_Name": "87-10 51st Ave #3E",
+      "Amount": 130000,
+      "Stage": "Closed Lost",
+      "id": "4981506000099009006",
+      "Closing_Date": "2026-03-24",
+      "Contact_Name": {
+        "name": "Mahfuzur Khan",
+        "id": "4981506000097011614"
+      },
+      "Neighborhood": null
+    },
+    {
+      "Deal_Name": "89-03 Doran Ave",
+      "Amount": 323000,
+      "Stage": "Closed Lost",
+      "id": "4981506000098969009",
+      "Closing_Date": "2026-04-14",
+      "Contact_Name": {
+        "name": "Stephanie Yang",
+        "id": "4981506000098363170"
+      },
+      "Neighborhood": "Ridgewood"
+    },
+    {
+      "Deal_Name": "32 Madison Avenue",
+      "Amount": 266783.75,
+      "Stage": "Closed Lost",
+      "id": "4981506000098956012",
+      "Closing_Date": "2026-04-16",
+      "Contact_Name": {
+        "name": "Eric Schnorr",
+        "id": "4981506000096861770"
+      },
+      "Neighborhood": "Kips Bay"
+    },
+    {
+      "Deal_Name": "23 Maplewood Dr",
+      "Amount": 208690,
+      "Stage": "Closed Won",
+      "id": "4981506000098664010",
+      "Closing_Date": "2026-03-20",
+      "Contact_Name": {
+        "name": "Olivia Chan Tim",
+        "id": "4981506000048144306"
+      },
+      "Neighborhood": "Bellport"
+    },
+    {
+      "Deal_Name": "51 West 81st Street #5A",
+      "Amount": 119000,
+      "Stage": "COLD",
+      "id": "4981506000098594022",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Anne Korkeavkivi",
+        "id": "4981506000097876058"
+      },
+      "Neighborhood": "Upper West Side"
+    },
+    {
+      "Deal_Name": "95 Hillside Avenue",
+      "Amount": 169525,
+      "Stage": "Closed Lost",
+      "id": "4981506000098494018",
+      "Closing_Date": "2026-05-05",
+      "Contact_Name": {
+        "name": "Zhi Chow",
+        "id": "4981506000097199283"
+      },
+      "Neighborhood": "Roxbury"
+    },
+    {
+      "Deal_Name": "2001 SW 13th St",
+      "Amount": 394399,
+      "Stage": "Closed Won",
+      "id": "4981506000098456026",
+      "Closing_Date": "2026-03-12",
+      "Contact_Name": {
+        "name": "Jennifer Thompson",
+        "id": "4981506000098129874"
+      },
+      "Neighborhood": "Shenandoah"
+    },
+    {
+      "Deal_Name": "16 West 21st Street #10/11",
+      "Amount": 217430,
+      "Stage": "Closed Won",
+      "id": "4981506000098086024",
+      "Closing_Date": "2026-05-31",
+      "Contact_Name": {
+        "name": "Gillian Tullman",
+        "id": "4981506000096680191"
+      },
+      "Neighborhood": "Chelsea"
+    },
+    {
+      "Deal_Name": "21 South End Ave #214",
+      "Amount": 172499,
+      "Stage": "Closed Won",
+      "id": "4981506000098079023",
+      "Closing_Date": "2026-03-13",
+      "Contact_Name": {
+        "name": "Daniela Pignataro",
+        "id": "4981506000097749050"
+      },
+      "Neighborhood": "Battery Park City"
+    },
+    {
+      "Deal_Name": "109 Shearwater Court East #24",
+      "Amount": 38665,
+      "Stage": "Closed Lost",
+      "id": "4981506000098047002",
+      "Closing_Date": "2026-04-13",
+      "Contact_Name": {
+        "name": "Sumiko Matsuda",
+        "id": "4981506000097199033"
+      },
+      "Neighborhood": null
+    },
+    {
+      "Deal_Name": "20 Confucius Plaza #13A",
+      "Amount": 111795,
+      "Stage": "Closed Won",
+      "id": "4981506000098044069",
+      "Closing_Date": "2026-03-10",
+      "Contact_Name": {
+        "name": "Eric Yung",
+        "id": "4981506000096403851"
+      },
+      "Neighborhood": "Lower East Side"
+    },
+    {
+      "Deal_Name": "889 Broadway #3C",
+      "Amount": 128730,
+      "Stage": "Closed Lost",
+      "id": "4981506000098044014",
+      "Closing_Date": "2026-04-07",
+      "Contact_Name": {
+        "name": "Enid Jean-Claude",
+        "id": "4981506000096929332"
+      },
+      "Neighborhood": "Union Square"
+    },
+    {
+      "Deal_Name": "35-40 30th St #1B",
+      "Amount": 165600,
+      "Stage": "Closed Lost",
+      "id": "4981506000097952002",
+      "Closing_Date": "2026-03-31",
+      "Contact_Name": {
+        "name": "David Shen",
+        "id": "4981506000096504122"
+      },
+      "Neighborhood": "Long Island City"
+    },
+    {
+      "Deal_Name": "305 East 24th Street #8C",
+      "Amount": 129500,
+      "Stage": "Closed Lost",
+      "id": "4981506000097931006",
+      "Closing_Date": "2026-03-16",
+      "Contact_Name": {
+        "name": "Mike DiTillio",
+        "id": "4981506000096782670"
+      },
+      "Neighborhood": "Kips Bay"
+    },
+    {
+      "Deal_Name": "411 West End Ave #9D",
+      "Amount": 159000,
+      "Stage": "COLD",
+      "id": "4981506000097915015",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Ellen Shoshkes",
+        "id": "4981506000095370028"
+      },
+      "Neighborhood": "Upper West Side"
+    },
     {
       "Deal_Name": "475 Brickell Avenue #2605",
       "Amount": 119841,
-      "Stage": "Proposal sent",
+      "Stage": "Closed Lost",
       "id": "4981506000097654016",
-      "Closing_Date": null,
+      "Closing_Date": "2026-06-04",
       "Contact_Name": {
         "name": "Garfield Sinclair",
         "id": "4981506000097199379"
@@ -15,10 +1551,10 @@
     },
     {
       "Deal_Name": "180 West 93rd Street #4E",
-      "Amount": 159500,
-      "Stage": "HOT",
+      "Amount": 200260,
+      "Stage": "Closed Won",
       "id": "4981506000097512006",
-      "Closing_Date": null,
+      "Closing_Date": "2026-04-14",
       "Contact_Name": {
         "name": "Brian Carpenter",
         "id": "4981506000096325464"
@@ -28,7 +1564,7 @@
     {
       "Deal_Name": "37 Devoe Street",
       "Amount": 277500,
-      "Stage": "HOT",
+      "Stage": "WARM",
       "id": "4981506000097502002",
       "Closing_Date": null,
       "Contact_Name": {
@@ -40,9 +1576,9 @@
     {
       "Deal_Name": "128 East 70th Street #3",
       "Amount": 145945,
-      "Stage": "WARM",
+      "Stage": "Closed Lost",
       "id": "4981506000097234006",
-      "Closing_Date": null,
+      "Closing_Date": "2026-04-07",
       "Contact_Name": {
         "name": "David Downing",
         "id": "4981506000096338346"
@@ -51,10 +1587,10 @@
     },
     {
       "Deal_Name": "1105 Northeast 116th Street",
-      "Amount": 429940,
-      "Stage": "Proposal sent",
+      "Amount": 133000,
+      "Stage": "Closed Lost",
       "id": "4981506000096860036",
-      "Closing_Date": null,
+      "Closing_Date": "2026-03-14",
       "Contact_Name": {
         "name": "Maxwell Stiss",
         "id": "4981506000096511456"
@@ -64,9 +1600,9 @@
     {
       "Deal_Name": "145 Northeast 101st Street",
       "Amount": 173537,
-      "Stage": "Proposal sent",
+      "Stage": "Closed Lost",
       "id": "4981506000096831036",
-      "Closing_Date": null,
+      "Closing_Date": "2026-04-14",
       "Contact_Name": {
         "name": "Laura Lefebvre Balard",
         "id": "4981506000096055331"
@@ -76,9 +1612,9 @@
     {
       "Deal_Name": "7410 JFK Boulevard East #4A",
       "Amount": 74790,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000096823027",
-      "Closing_Date": null,
+      "Closing_Date": "2026-06-08",
       "Contact_Name": {
         "name": "Kevin O'Brien",
         "id": "4981506000094855860"
@@ -100,9 +1636,9 @@
     {
       "Deal_Name": "279 Sylvan Road",
       "Amount": 354160,
-      "Stage": "WARM",
+      "Stage": "Closed Lost",
       "id": "4981506000096723002",
-      "Closing_Date": null,
+      "Closing_Date": "2026-03-24",
       "Contact_Name": {
         "name": "Charles Kelly",
         "id": "4981506000095044198"
@@ -112,9 +1648,9 @@
     {
       "Deal_Name": "1725 York Ave #5E",
       "Amount": 122000,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000096700014",
-      "Closing_Date": null,
+      "Closing_Date": "2026-03-17",
       "Contact_Name": {
         "name": "Sagar Beharry",
         "id": "4981506000095815101"
@@ -124,9 +1660,9 @@
     {
       "Deal_Name": "3907 NW 199th St",
       "Amount": 333213,
-      "Stage": "Proposal sent",
+      "Stage": "Closed Lost",
       "id": "4981506000096647013",
-      "Closing_Date": null,
+      "Closing_Date": "2026-03-10",
       "Contact_Name": {
         "name": "Ida Chester",
         "id": "4981506000094686757"
@@ -136,9 +1672,9 @@
     {
       "Deal_Name": "3131 Northeast 188th Street",
       "Amount": 315561,
-      "Stage": "Proposal sent",
+      "Stage": "Closed Lost",
       "id": "4981506000096605030",
-      "Closing_Date": null,
+      "Closing_Date": "2026-06-24",
       "Contact_Name": {
         "name": "Ariel Lifshitz",
         "id": "4981506000095099282"
@@ -147,10 +1683,10 @@
     },
     {
       "Deal_Name": "605 West 29th Street",
-      "Amount": 597147,
-      "Stage": "Proposal sent",
+      "Amount": 400310,
+      "Stage": "Closed Won",
       "id": "4981506000096548016",
-      "Closing_Date": null,
+      "Closing_Date": "2026-06-19",
       "Contact_Name": {
         "name": "Francia Salazar",
         "id": "4981506000096403995"
@@ -160,9 +1696,9 @@
     {
       "Deal_Name": "130 Southwest 109th Avenue #7",
       "Amount": 94290,
-      "Stage": "Proposal sent",
+      "Stage": "Closed Lost",
       "id": "4981506000096452004",
-      "Closing_Date": null,
+      "Closing_Date": "2026-04-07",
       "Contact_Name": {
         "name": "Yong Cai",
         "id": "4981506000095188250"
@@ -196,9 +1732,9 @@
     {
       "Deal_Name": "65 West 13th Street #3E",
       "Amount": 205900,
-      "Stage": "WARM",
+      "Stage": "Closed Lost",
       "id": "4981506000096293022",
-      "Closing_Date": null,
+      "Closing_Date": "2026-03-17",
       "Contact_Name": {
         "name": "Marisa Scali",
         "id": "4981506000095724153"
@@ -208,9 +1744,9 @@
     {
       "Deal_Name": "517 West 46th Street #704",
       "Amount": 85000,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000096289036",
-      "Closing_Date": null,
+      "Closing_Date": "2026-03-10",
       "Contact_Name": {
         "name": "Jose Bustos",
         "id": "4981506000094900324"
@@ -220,7 +1756,7 @@
     {
       "Deal_Name": "227 West 27th Street",
       "Amount": 350544,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000096214002",
       "Closing_Date": null,
       "Contact_Name": {
@@ -231,10 +1767,10 @@
     },
     {
       "Deal_Name": "517 West 46th Street #704",
-      "Amount": null,
-      "Stage": "COLD",
+      "Amount": 76000,
+      "Stage": "Closed Lost",
       "id": "4981506000096194006",
-      "Closing_Date": null,
+      "Closing_Date": "2026-03-10",
       "Contact_Name": {
         "name": "Jose Bustos",
         "id": "4981506000094900324"
@@ -244,9 +1780,9 @@
     {
       "Deal_Name": "862 Park Pl",
       "Amount": 335400,
-      "Stage": "HOT",
+      "Stage": "Closed Lost",
       "id": "4981506000096172025",
-      "Closing_Date": null,
+      "Closing_Date": "2026-03-06",
       "Contact_Name": {
         "name": "Stacey Cornelius",
         "id": "4981506000093146917"
@@ -267,10 +1803,10 @@
     },
     {
       "Deal_Name": "394 15th Street #3R",
-      "Amount": 116000,
-      "Stage": "HOT",
+      "Amount": 116884.2,
+      "Stage": "Closed Won",
       "id": "4981506000095686081",
-      "Closing_Date": null,
+      "Closing_Date": "2026-03-03",
       "Contact_Name": {
         "name": "Sairus Bueno",
         "id": "4981506000094394623"
@@ -279,10 +1815,10 @@
     },
     {
       "Deal_Name": "595 West End Avenue #8C",
-      "Amount": 181535,
-      "Stage": "WARM",
+      "Amount": 189535,
+      "Stage": "Closed Won",
       "id": "4981506000095686030",
-      "Closing_Date": null,
+      "Closing_Date": "2026-04-07",
       "Contact_Name": {
         "name": "Michael Hearn",
         "id": "4981506000093874035"
@@ -304,9 +1840,9 @@
     {
       "Deal_Name": "90 Riverside Drive #7E",
       "Amount": 191240,
-      "Stage": "WARM",
+      "Stage": "Closed Lost",
       "id": "4981506000095632015",
-      "Closing_Date": "2026-02-10",
+      "Closing_Date": "2026-04-21",
       "Contact_Name": {
         "name": "Alyssa Aguilera",
         "id": "4981506000068304952"
@@ -328,9 +1864,9 @@
     {
       "Deal_Name": "6 Harmony Drive",
       "Amount": 93364,
-      "Stage": "WARM",
+      "Stage": "Closed Lost",
       "id": "4981506000095019028",
-      "Closing_Date": null,
+      "Closing_Date": "2026-04-27",
       "Contact_Name": {
         "name": "Gary Elliott",
         "id": "4981506000092681754"
@@ -388,9 +1924,9 @@
     {
       "Deal_Name": "127 Greene St #4",
       "Amount": 180500,
-      "Stage": "HOT",
+      "Stage": "Closed Won",
       "id": "4981506000094045010",
-      "Closing_Date": null,
+      "Closing_Date": "2026-04-06",
       "Contact_Name": {
         "name": "Robert Wolchok",
         "id": "4981506000090417997"
@@ -424,9 +1960,9 @@
     {
       "Deal_Name": "22 Miller Rd",
       "Amount": 111986,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000093898002",
-      "Closing_Date": null,
+      "Closing_Date": "2026-03-10",
       "Contact_Name": {
         "name": "Charlie Meade",
         "id": "4981506000091942833"
@@ -459,7 +1995,7 @@
     },
     {
       "Deal_Name": "173 East 70th Street",
-      "Amount": 529917,
+      "Amount": 905500,
       "Stage": "HOT",
       "id": "4981506000093719002",
       "Closing_Date": null,
@@ -472,9 +2008,9 @@
     {
       "Deal_Name": "910 Union Street #3A",
       "Amount": 166500,
-      "Stage": "HOT",
+      "Stage": "Closed Lost",
       "id": "4981506000093699010",
-      "Closing_Date": null,
+      "Closing_Date": "2026-04-21",
       "Contact_Name": {
         "name": "Asma Ahmad",
         "id": "4981506000092542003"
@@ -544,9 +2080,9 @@
     {
       "Deal_Name": "125 North 10th Street #N5C",
       "Amount": 154600,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000093094008",
-      "Closing_Date": null,
+      "Closing_Date": "2026-03-31",
       "Contact_Name": {
         "name": "Dan Pinkert",
         "id": "4981506000092007653"
@@ -568,7 +2104,7 @@
     {
       "Deal_Name": "32 Tompkins Road",
       "Amount": 203100,
-      "Stage": "HOT",
+      "Stage": "COLD",
       "id": "4981506000092934032",
       "Closing_Date": null,
       "Contact_Name": {
@@ -640,9 +2176,9 @@
     {
       "Deal_Name": "155 West 68th #616",
       "Amount": 128600,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000092200006",
-      "Closing_Date": null,
+      "Closing_Date": "2026-06-16",
       "Contact_Name": {
         "name": "Gerardo Guerra",
         "id": "4981506000091683099"
@@ -676,9 +2212,9 @@
     {
       "Deal_Name": "15 West 53rd Street",
       "Amount": 122490,
-      "Stage": "WARM",
+      "Stage": "Closed Lost",
       "id": "4981506000091501006",
-      "Closing_Date": null,
+      "Closing_Date": "2026-04-15",
       "Contact_Name": {
         "name": "Alain Azaria",
         "id": "4981506000090604077"
@@ -700,9 +2236,9 @@
     {
       "Deal_Name": "2570C Frederick Douglass Blvd",
       "Amount": 149500,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000091427012",
-      "Closing_Date": null,
+      "Closing_Date": "2026-03-10",
       "Contact_Name": {
         "name": "Vann Graves",
         "id": "4981506000090253468"
@@ -724,9 +2260,9 @@
     {
       "Deal_Name": "315 East 65th Street #8H",
       "Amount": 195600,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000091378002",
-      "Closing_Date": null,
+      "Closing_Date": "2026-04-14",
       "Contact_Name": {
         "name": "Megan Heal-Schloss",
         "id": "4981506000088150603"
@@ -736,9 +2272,9 @@
     {
       "Deal_Name": "1168 Northeast 101st Street",
       "Amount": 285365,
-      "Stage": "Proposal sent",
+      "Stage": "Closed Lost",
       "id": "4981506000091103002",
-      "Closing_Date": null,
+      "Closing_Date": "2026-04-14",
       "Contact_Name": {
         "name": "Ryan Daniels",
         "id": "4981506000090417903"
@@ -748,7 +2284,7 @@
     {
       "Deal_Name": "3748 Washington Ave",
       "Amount": 277365,
-      "Stage": "Proposal sent",
+      "Stage": "Closed Lost",
       "id": "4981506000091089008",
       "Closing_Date": null,
       "Contact_Name": {
@@ -772,9 +2308,9 @@
     {
       "Deal_Name": "332 East 84th Street #5A",
       "Amount": 128455,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000091040002",
-      "Closing_Date": null,
+      "Closing_Date": "2026-03-10",
       "Contact_Name": {
         "name": "Joanna Antisell",
         "id": "4981506000089952585"
@@ -856,7 +2392,7 @@
     {
       "Deal_Name": "433 Warren Street #4A",
       "Amount": 156477,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000089778002",
       "Closing_Date": null,
       "Contact_Name": {
@@ -952,9 +2488,9 @@
     {
       "Deal_Name": "1 Morse Drive",
       "Amount": 296020,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000088957006",
-      "Closing_Date": null,
+      "Closing_Date": "2026-06-08",
       "Contact_Name": {
         "name": "Pradeep Chelpati",
         "id": "4981506000081758701"
@@ -976,9 +2512,9 @@
     {
       "Deal_Name": "4 Beach Street",
       "Amount": 137010,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000088507059",
-      "Closing_Date": null,
+      "Closing_Date": "2026-06-08",
       "Contact_Name": {
         "name": "Jessica Kurz",
         "id": "4981506000087248055"
@@ -1084,9 +2620,9 @@
     {
       "Deal_Name": "67 Parkview Ter",
       "Amount": 292240,
-      "Stage": "WARM",
+      "Stage": "Closed Lost",
       "id": "4981506000087299035",
-      "Closing_Date": null,
+      "Closing_Date": "2026-04-09",
       "Contact_Name": {
         "name": "Derrick Green",
         "id": "4981506000086244058"
@@ -1120,9 +2656,9 @@
     {
       "Deal_Name": "1500 Hudson St #9L",
       "Amount": 59400,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000086837038",
-      "Closing_Date": null,
+      "Closing_Date": "2026-04-22",
       "Contact_Name": {
         "name": "Francesca Damato",
         "id": "4981506000084693956"
@@ -1228,7 +2764,7 @@
     {
       "Deal_Name": "448 West 37th Street #12F",
       "Amount": 265000,
-      "Stage": "WARM",
+      "Stage": "COLD",
       "id": "4981506000085583010",
       "Closing_Date": null,
       "Contact_Name": {
@@ -1264,9 +2800,9 @@
     {
       "Deal_Name": "350 Albany Street #11A",
       "Amount": 185600,
-      "Stage": "WARM",
+      "Stage": "Closed Lost",
       "id": "4981506000085328002",
-      "Closing_Date": null,
+      "Closing_Date": "2026-05-04",
       "Contact_Name": {
         "name": "Julian Ha",
         "id": "4981506000081384611"
@@ -1288,9 +2824,9 @@
     {
       "Deal_Name": "60 Ella Street",
       "Amount": 244015,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000085015002",
-      "Closing_Date": null,
+      "Closing_Date": "2026-04-15",
       "Contact_Name": {
         "name": "Harshal Shah",
         "id": "4981506000080210016"
@@ -1348,9 +2884,9 @@
     {
       "Deal_Name": "412 10th Street",
       "Amount": 147390,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000084638023",
-      "Closing_Date": null,
+      "Closing_Date": "2026-06-08",
       "Contact_Name": {
         "name": "Jenyffer Zorrilla",
         "id": "4981506000084051317"
@@ -1420,9 +2956,9 @@
     {
       "Deal_Name": "104 Moffat St",
       "Amount": 415500,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000083233006",
-      "Closing_Date": null,
+      "Closing_Date": "2026-04-13",
       "Contact_Name": {
         "name": "Jennifer McCabe",
         "id": "4981506000082081231"
@@ -1540,9 +3076,9 @@
     {
       "Deal_Name": "420 East 51st Street #2J",
       "Amount": 295600,
-      "Stage": "WARM",
+      "Stage": "Closed Lost",
       "id": "4981506000082030010",
-      "Closing_Date": null,
+      "Closing_Date": "2026-06-23",
       "Contact_Name": {
         "name": "Usman Khaqan",
         "id": "4981506000081164504"
@@ -1600,9 +3136,9 @@
     {
       "Deal_Name": "14 Amherst Pl",
       "Amount": 298230,
-      "Stage": "WARM",
+      "Stage": "Closed Lost",
       "id": "4981506000081936029",
-      "Closing_Date": null,
+      "Closing_Date": "2026-06-08",
       "Contact_Name": {
         "name": "John Burkhart",
         "id": "4981506000080251205"
@@ -2775,10 +4311,10 @@
     },
     {
       "Deal_Name": "101 West 12th Street #6MN",
-      "Amount": 262515,
-      "Stage": "Closed Lost",
+      "Amount": 142072.5,
+      "Stage": "Closed Won",
       "id": "4981506000071979002",
-      "Closing_Date": "2025-07-16",
+      "Closing_Date": "2026-03-22",
       "Contact_Name": {
         "name": "Kiran Patel",
         "id": "4981506000071362036"
@@ -4021,7 +5557,7 @@
     {
       "Deal_Name": "161 Remsen Street #7C",
       "Amount": 251735,
-      "Stage": "COLD",
+      "Stage": "WARM",
       "id": "4981506000064527014",
       "Closing_Date": null,
       "Contact_Name": {
@@ -4572,10 +6108,10 @@
     },
     {
       "Deal_Name": "250 Mercer Street #C312",
-      "Amount": 229500,
-      "Stage": "COLD",
+      "Amount": 260131,
+      "Stage": "Closed Won",
       "id": "4981506000061506008",
-      "Closing_Date": null,
+      "Closing_Date": "2026-04-21",
       "Contact_Name": {
         "name": "Benjamin Duffield",
         "id": "4981506000060574052"
@@ -6613,7 +8149,7 @@
     {
       "Deal_Name": "52 Rogers Ave",
       "Amount": 229355,
-      "Stage": "Closed Won",
+      "Stage": "Closed Lost",
       "id": "4981506000050844029",
       "Closing_Date": "2024-07-30",
       "Contact_Name": {
@@ -10994,5 +12530,5 @@
       "Neighborhood": "Harlem"
     }
   ],
-  "count": 917
+  "count": 1045
 }
