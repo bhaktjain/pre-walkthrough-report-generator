@@ -49,6 +49,52 @@ def _to_number(value) -> Optional[float]:
     return None
 
 
+# Palette (matches the report preview): brand near-black + warm neutrals.
+LABEL_FILL = 'F4F2EE'    # shaded label column
+ZEBRA_FILL = 'FAF9F7'    # alternating value rows
+HEADER_FILL = '231F20'   # dark header row (neighbors table)
+BORDER_COLOR = 'DDDAD4'  # light table borders
+RULE_COLOR = 'C9C3BA'    # subtle rule under section headings
+WHITE = RGBColor(0xFF, 0xFF, 0xFF)
+
+
+def _shade_cell(cell, fill_hex: str) -> None:
+    """Apply a solid background fill to a table cell."""
+    tcPr = cell._tc.get_or_add_tcPr()
+    shd = OxmlElement('w:shd')
+    shd.set(qn('w:val'), 'clear')
+    shd.set(qn('w:color'), 'auto')
+    shd.set(qn('w:fill'), fill_hex)
+    tcPr.append(shd)
+
+
+def _heading_rule(paragraph, color_hex: str, sz: str) -> None:
+    """Add a bottom border (divider rule) under a heading paragraph."""
+    pPr = paragraph._p.get_or_add_pPr()
+    pbdr = OxmlElement('w:pBdr')
+    bottom = OxmlElement('w:bottom')
+    bottom.set(qn('w:val'), 'single')
+    bottom.set(qn('w:sz'), sz)
+    bottom.set(qn('w:space'), '4')
+    bottom.set(qn('w:color'), color_hex)
+    pbdr.append(bottom)
+    pPr.append(pbdr)
+
+
+def _table_borders(table, color_hex: str, sz: str = '4') -> None:
+    """Set light, uniform borders on a table (replaces the heavy black grid)."""
+    tblPr = table._tbl.tblPr
+    borders = OxmlElement('w:tblBorders')
+    for edge in ('top', 'left', 'bottom', 'right', 'insideH', 'insideV'):
+        e = OxmlElement(f'w:{edge}')
+        e.set(qn('w:val'), 'single')
+        e.set(qn('w:sz'), sz)
+        e.set(qn('w:space'), '0')
+        e.set(qn('w:color'), color_hex)
+        borders.append(e)
+    tblPr.append(borders)
+
+
 class DocumentGenerator:
     def __init__(self):
         self.doc = Document()
@@ -85,6 +131,12 @@ class DocumentGenerator:
         heading = self.doc.add_heading(text, level)
         for run in heading.runs:
             run.font.color.rgb = HEADING_COLOR
+        # Divider rules: a bold brand rule under the title, a subtle rule under
+        # each section heading (matches the report preview's sectioned look).
+        if level == 0:
+            _heading_rule(heading, HEADER_FILL, '12')
+        elif level == 1:
+            _heading_rule(heading, RULE_COLOR, '6')
         return heading
 
     @staticmethod
@@ -96,6 +148,29 @@ class DocumentGenerator:
             return int(num)
         except (ValueError, OverflowError):
             return None
+
+    @staticmethod
+    def _is_meaningful(value) -> bool:
+        """True if a value carries real content.
+
+        Recurses into dicts/lists so template defaults like {"range": {"min": 0,
+        "max": None}} or {"type": "", "preferences": []} are correctly treated as
+        empty (this is what produced 'min: 0' / '$0 - TBD' / blank rows before).
+        Zero numbers and blank strings are NOT meaningful.
+        """
+        if value is None:
+            return False
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return value != 0
+        if isinstance(value, str):
+            return bool(value.strip())
+        if isinstance(value, dict):
+            return any(DocumentGenerator._is_meaningful(v) for v in value.values())
+        if isinstance(value, (list, tuple)):
+            return any(DocumentGenerator._is_meaningful(v) for v in value)
+        return True
 
     def _lines(self, value) -> list:
         """Normalize a value to a list of non-empty display strings."""
@@ -522,6 +597,7 @@ class DocumentGenerator:
             table.alignment = WD_TABLE_ALIGNMENT.CENTER
             table.autofit = False
             table.allow_autofit = False
+            _table_borders(table, BORDER_COLOR)
             ncols = len(table.columns)
             if ncols == 2:
                 widths = (Inches(2.2), Inches(4.3))
@@ -529,18 +605,36 @@ class DocumentGenerator:
                 widths = (Inches(3.5), Inches(1.5), Inches(1.5))
             else:
                 widths = None
-            for row in table.rows:
+            for r_idx, row in enumerate(table.rows):
                 cells = row.cells
                 for idx, cell in enumerate(cells):
                     cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
                     if widths and idx < len(widths):
                         cell.width = widths[idx]
-                # Bold the label column of key/value tables only (a 3-col table's
-                # first column is data, and its header row is already bold).
+
                 if ncols == 2:
+                    # Bold + shade the label column; zebra-stripe value cells.
                     for paragraph in cells[0].paragraphs:
                         for run in paragraph.runs:
                             run.font.bold = True
+                    _shade_cell(cells[0], LABEL_FILL)
+                    if r_idx % 2 == 1:
+                        _shade_cell(cells[1], ZEBRA_FILL)
+                elif ncols == 3:
+                    if r_idx == 0:
+                        # Dark header row with white, bold text.
+                        for cell in cells:
+                            _shade_cell(cell, HEADER_FILL)
+                            for paragraph in cell.paragraphs:
+                                for run in paragraph.runs:
+                                    run.font.bold = True
+                                    run.font.color.rgb = WHITE
+                    elif r_idx % 2 == 0:
+                        for cell in cells:
+                            _shade_cell(cell, ZEBRA_FILL)
+                    # Right-align the Amount column for tidy figures.
+                    for paragraph in cells[1].paragraphs:
+                        paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
 
     def _add_building_requirements(self, data: Dict[str, Any]):
         """Add building requirements section from transcript data only (no hard-coded rules)."""
@@ -572,18 +666,26 @@ class DocumentGenerator:
         for section_name, section in renovation.items():
             if section_name.lower() == 'timeline':
                 continue  # handled in dedicated timeline section
-            if not isinstance(section, dict) or all(v in (None, '', [], {}) for v in section.values()):
+            if not isinstance(section, dict) or not self._is_meaningful(section):
+                continue
+            rows = []
+            for key, value in section.items():
+                if not self._is_meaningful(value):
+                    continue
+                pretty = self._stringify(value)
+                if not pretty.strip():
+                    continue
+                rows.append((key.replace('_', ' ').title(), pretty))
+            if not rows:
                 continue
             rendered_any = True
             self._heading(section_name.replace('_', ' ').title(), level=2)
             table = self.doc.add_table(rows=0, cols=2)
             table.style = 'Table Grid'
-            for key, value in section.items():
-                if value in (None, '', [], {}):
-                    continue
-                row = table.add_row().cells
-                row[0].text = key.replace('_', ' ').title()
-                row[1].text = self._stringify(value)
+            for label, pretty in rows:
+                cells = table.add_row().cells
+                cells[0].text = label
+                cells[1].text = pretty
 
         if not rendered_any:
             self.doc.add_paragraph('N/A')
@@ -592,18 +694,26 @@ class DocumentGenerator:
         """Add a Materials & Design section (skipped entirely when empty)."""
         transcript_info = data.get('transcript_info') or {}
         materials = transcript_info.get('materials_and_design') or {}
-        if not isinstance(materials, dict) or all(v in (None, '', [], {}) for v in materials.values()):
+        if not isinstance(materials, dict) or not self._is_meaningful(materials):
+            return
+
+        rows = []
+        for key, value in materials.items():
+            if not self._is_meaningful(value):
+                continue
+            pretty = self._stringify(value)
+            if pretty.strip():
+                rows.append((key.replace('_', ' ').title(), pretty))
+        if not rows:
             return
 
         self._heading('Materials & Design', level=1)
         table = self.doc.add_table(rows=0, cols=2)
         table.style = 'Table Grid'
-        for key, value in materials.items():
-            if value in (None, '', [], {}):
-                continue
-            row = table.add_row().cells
-            row[0].text = key.replace('_', ' ').title()
-            row[1].text = self._stringify(value)
+        for label, pretty in rows:
+            cells = table.add_row().cells
+            cells[0].text = label
+            cells[1].text = pretty
 
     def _add_timeline_phasing(self, data: Dict[str, Any]):
         """Add timeline and phasing section dynamically (no default placeholder values)."""
@@ -677,10 +787,10 @@ class DocumentGenerator:
         krange = (kitchen.get('estimated_cost') or {}).get('range') or {}
         kmin = _to_number(krange.get('min'))
         kmax = _to_number(krange.get('max'))
-        if kmin is not None:
-            details.append(('Kitchen Total', f"{self._format_currency(kmin)} - {self._format_currency(kmax) if kmax is not None else 'TBD'}"))
+        if kmin:  # treat 0 / None (template default) as "no kitchen budget given"
+            details.append(('Kitchen Total', f"{self._format_currency(kmin)} - {self._format_currency(kmax) if kmax else 'TBD'}"))
             min_total += kmin
-            max_total += kmax if kmax is not None else kmin
+            max_total += kmax if kmax else kmin
             have_total = True
 
         # Bathrooms (cap count defensively)
@@ -696,19 +806,19 @@ class DocumentGenerator:
 
         # Per-sq-ft rate — display only, NOT summed into the total.
         per_sqft = _to_number(estimated_costs.get('per_sqft_cost'))
-        if per_sqft is not None:
+        if per_sqft:
             details.append(('Cost per Sq Ft', f"{self._format_currency(per_sqft)}/sq ft"))
 
         # Architect fees
         arch = estimated_costs.get('architect_fees') or {}
         arch_amt = _to_number(arch.get('estimated_amount')) if isinstance(arch, dict) else None
         arch_pct = _to_number(arch.get('percentage')) if isinstance(arch, dict) else None
-        if arch_amt is not None:
+        if arch_amt:
             details.append(('Architect Fees', self._format_currency(arch_amt)))
             min_total += arch_amt
             max_total += arch_amt
             have_total = True
-        elif arch_pct is not None:
+        elif arch_pct:
             details.append(('Architect Fees', f"{arch_pct:g}%"))
 
         # Other simple numeric line items
@@ -718,7 +828,7 @@ class DocumentGenerator:
                 if item in handled:
                     continue
                 c = _to_number(cost)
-                if c is not None:
+                if c:
                     details.append((item.replace('_', ' ').title(), self._format_currency(c)))
                     min_total += c
                     max_total += c
@@ -732,7 +842,7 @@ class DocumentGenerator:
         tr = estimated_costs.get('total_estimated_range') or {}
         tr_min = _to_number(tr.get('min')) if isinstance(tr, dict) else None
         tr_max = _to_number(tr.get('max')) if isinstance(tr, dict) else None
-        if tr_min is not None or tr_max is not None:
+        if tr_min or tr_max:
             lo = tr_min if tr_min is not None else tr_max
             hi = tr_max if tr_max is not None else tr_min
             details.append(('Estimated Total Range', f"{self._format_currency(lo)} - {self._format_currency(hi)}"))
@@ -757,18 +867,26 @@ class DocumentGenerator:
         """Add a Project Management section (skipped entirely when empty)."""
         transcript_info = data.get('transcript_info') or {}
         pm = transcript_info.get('project_management') or {}
-        if not isinstance(pm, dict) or all(v in (None, '', [], {}) for v in pm.values()):
+        if not isinstance(pm, dict) or not self._is_meaningful(pm):
+            return
+
+        rows = []
+        for key, value in pm.items():
+            if not self._is_meaningful(value):
+                continue
+            pretty = self._stringify(value)
+            if pretty.strip():
+                rows.append((key.replace('_', ' ').title(), pretty))
+        if not rows:
             return
 
         self._heading('Project Management', level=1)
         table = self.doc.add_table(rows=0, cols=2)
         table.style = 'Table Grid'
-        for key, value in pm.items():
-            if value in (None, '', [], {}):
-                continue
-            row = table.add_row().cells
-            row[0].text = key.replace('_', ' ').title()
-            row[1].text = self._stringify(value)
+        for label, pretty in rows:
+            cells = table.add_row().cells
+            cells[0].text = label
+            cells[1].text = pretty
 
     def _add_notes(self, data: Dict[str, Any]):
         """Add notes section"""
@@ -925,23 +1043,27 @@ class DocumentGenerator:
     # Helper to stringify complex values for tables
     # ------------------------------------------------------------------
     def _stringify(self, value):
-        """Convert list/dict to human-readable string without brackets/quotes."""
-        if isinstance(value, list):
-            return ', '.join(str(v) for v in value if v not in (None, '', [], {}))
+        """Convert list/dict to a human-readable string, dropping empty/zero parts."""
+        if isinstance(value, (list, tuple)):
+            return ', '.join(str(v) for v in value if self._is_meaningful(v))
         if isinstance(value, dict):
             parts = []
             for k, v in value.items():
-                if v in (None, '', [], {}):
+                if not self._is_meaningful(v):
                     continue
+                label = str(k).replace('_', ' ').title()
                 if isinstance(v, dict):
-                    sub = ', '.join(f"{sk}: {sv}" for sk, sv in v.items() if sv not in (None, '', [], {}))
+                    sub = ', '.join(
+                        f"{str(sk).replace('_', ' ')}: {sv}"
+                        for sk, sv in v.items() if self._is_meaningful(sv)
+                    )
                     if sub:
-                        parts.append(f"{str(k).replace('_', ' ').title()} → {sub}")
-                elif isinstance(v, list):
-                    items = ', '.join(str(i) for i in v if i not in (None, '', [], {}))
+                        parts.append(f"{label} → {sub}")
+                elif isinstance(v, (list, tuple)):
+                    items = ', '.join(str(i) for i in v if self._is_meaningful(i))
                     if items:
-                        parts.append(f"{str(k).replace('_', ' ').title()}: {items}")
+                        parts.append(f"{label}: {items}")
                 else:
-                    parts.append(f"{str(k).replace('_', ' ').title()}: {v}")
+                    parts.append(f"{label}: {v}")
             return '; '.join(parts)
         return str(value)
