@@ -2,6 +2,7 @@ from docx import Document
 from docx.shared import Pt, RGBColor, Inches
 from docx.enum.style import WD_STYLE_TYPE
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.opc.constants import RELATIONSHIP_TYPE
@@ -20,6 +21,11 @@ HEADING_COLOR = RGBColor(0x23, 0x1F, 0x20)
 
 # Network timeout (seconds) for downloading images / floor plans.
 IMAGE_DOWNLOAD_TIMEOUT = 15
+
+# Cap how many neighboring projects are listed in the report so a large
+# neighborhood doesn't produce a giant table. The list is pre-sorted
+# (same-building first, then by amount), so the most relevant are shown.
+MAX_NEIGHBORING_PROJECTS = 15
 
 
 def _to_number(value) -> Optional[float]:
@@ -505,6 +511,37 @@ class DocumentGenerator:
         """Add a section break for clarity"""
         self.doc.add_paragraph()
 
+    def _finalize_tables(self):
+        """Normalize every table for a clean, aligned, symmetric layout.
+
+        Fixed column widths (summing to the 6.5" content area on a 1"-margin
+        Letter page), tables centered, cells vertically centered, and bold
+        labels on two-column key/value tables.
+        """
+        for table in self.doc.tables:
+            table.alignment = WD_TABLE_ALIGNMENT.CENTER
+            table.autofit = False
+            table.allow_autofit = False
+            ncols = len(table.columns)
+            if ncols == 2:
+                widths = (Inches(2.2), Inches(4.3))
+            elif ncols == 3:
+                widths = (Inches(3.5), Inches(1.5), Inches(1.5))
+            else:
+                widths = None
+            for row in table.rows:
+                cells = row.cells
+                for idx, cell in enumerate(cells):
+                    cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+                    if widths and idx < len(widths):
+                        cell.width = widths[idx]
+                # Bold the label column of key/value tables only (a 3-col table's
+                # first column is data, and its header row is already bold).
+                if ncols == 2:
+                    for paragraph in cells[0].paragraphs:
+                        for run in paragraph.runs:
+                            run.font.bold = True
+
     def _add_building_requirements(self, data: Dict[str, Any]):
         """Add building requirements section from transcript data only (no hard-coded rules)."""
         self._heading('Building Requirements', level=1)
@@ -786,9 +823,11 @@ class DocumentGenerator:
         self.doc.add_paragraph(intro)
         self.doc.add_paragraph()
 
+        # Cap the rendered rows for a clean report (list is pre-sorted by relevance).
+        display = neighboring_projects[:MAX_NEIGHBORING_PROJECTS]
+
         table = self.doc.add_table(rows=1, cols=3)
         table.style = 'Table Grid'
-        table.autofit = True
 
         header_cells = table.rows[0].cells
         for i, header in enumerate(['Project Address', 'Amount', 'Stage']):
@@ -797,7 +836,7 @@ class DocumentGenerator:
                 for run in paragraph.runs:
                     run.font.bold = True
 
-        for project in neighboring_projects:
+        for project in display:
             row_cells = table.add_row().cells
             row_cells[0].text = str(project.get('deal_name', 'N/A'))
 
@@ -805,6 +844,11 @@ class DocumentGenerator:
             row_cells[1].text = self._format_currency(amount) if (amount is not None and amount > 0) else "TBD"
 
             row_cells[2].text = str(project.get('stage', 'Unknown'))
+
+        if len(neighboring_projects) > len(display):
+            self.doc.add_paragraph(
+                f"Showing the {len(display)} most relevant of {len(neighboring_projects)} projects in this neighborhood."
+            )
 
     def generate_report(self, data: Dict[str, Any], output_dir: str = "data", file_name: str = None) -> Optional[str]:
         """Generate the pre-walkthrough report.
@@ -840,6 +884,9 @@ class DocumentGenerator:
                     logger.error("Failed to render report section '%s': %s", name, e, exc_info=True)
                     self.doc.add_paragraph(f"[Section unavailable: {name}]")
                     self._add_section_break()
+
+            # Uniform, symmetric table layout across the whole report.
+            self._finalize_tables()
 
             if not file_name:
                 file_name = f"PreWalk_{self._sanitize_filename(str(data.get('property_address', 'report')).split(',')[0])}.docx"

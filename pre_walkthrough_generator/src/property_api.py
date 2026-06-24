@@ -69,7 +69,7 @@ class PropertyAPI:
             logger.info(f"Fetching details for property ID: {property_id}")
             data = self._make_request("/v2/property", {"id": property_id})
             if isinstance(data, dict):
-                logger.info(f"[DEBUG] Raw API response keys: {list(data.keys())}")
+                logger.debug(f"[DEBUG] Raw API response keys: {list(data.keys())}")
             if not data or 'data' not in data or not data['data']:
                 logger.error(f"[ERROR] API response missing 'data' key or empty. Keys: {list(data.keys()) if isinstance(data, dict) else type(data)}")
                 return {}
@@ -126,7 +126,7 @@ class PropertyAPI:
                 price = search_details_any(r'Price: \$?([\d,]+)')
                 if price:
                     price = int(price.replace(',', ''))
-            logger.info(f"[DEBUG] Price: {price}")
+            logger.debug(f"[DEBUG] Price: {price}")
 
             # Last sold price and date
             last_sold_price = d.get('last_sold_price')
@@ -141,8 +141,8 @@ class PropertyAPI:
                             last_sold_date = hist['date']
                         if last_sold_price and last_sold_date:
                             break
-            logger.info(f"[DEBUG] Last Sold Price: {last_sold_price}")
-            logger.info(f"[DEBUG] Last Sold Date: {last_sold_date}")
+            logger.debug(f"[DEBUG] Last Sold Price: {last_sold_price}")
+            logger.debug(f"[DEBUG] Last Sold Date: {last_sold_date}")
             description = d.get('description') or {}
             bedrooms = description.get('beds')
             if not bedrooms:
@@ -155,7 +155,7 @@ class PropertyAPI:
                 bedrooms = search_details_any(r'Bedroom[s]?: (\d+)')
             if not bedrooms:
                 bedrooms = 'Information not available'
-            logger.info(f"[DEBUG] Bedrooms: {bedrooms}")
+            logger.debug(f"[DEBUG] Bedrooms: {bedrooms}")
 
             # Bathrooms
             bathrooms = description.get('baths') or description.get('baths_consolidated')
@@ -169,7 +169,7 @@ class PropertyAPI:
                 bathrooms = search_details_any(r'Bathroom[s]?: (\d+)')
             if not bathrooms:
                 bathrooms = 'Information not available'
-            logger.info(f"[DEBUG] Bathrooms: {bathrooms}")
+            logger.debug(f"[DEBUG] Bathrooms: {bathrooms}")
 
             # Rooms (total rooms)
             rooms = search_details('Other Rooms', r'Total Rooms: (\d+)')
@@ -177,7 +177,7 @@ class PropertyAPI:
                 rooms = search_details_any(r'Total Rooms: (\d+)')
             if not rooms:
                 rooms = 'Information not available'
-            logger.info(f"[DEBUG] Rooms: {rooms}")
+            logger.debug(f"[DEBUG] Rooms: {rooms}")
 
             # Sqft
             sqft = description.get('sqft')
@@ -193,7 +193,7 @@ class PropertyAPI:
                         break
             if not sqft:
                 sqft = 'Information not available'
-            logger.info(f"[DEBUG] Sqft: {sqft}")
+            logger.debug(f"[DEBUG] Sqft: {sqft}")
 
             # Year Built
             year_built = description.get('year_built')
@@ -201,7 +201,7 @@ class PropertyAPI:
                 year_built = search_details_any(r'Year Built: (\d{4})')
             if not year_built:
                 year_built = 'Information not available'
-            logger.info(f"[DEBUG] Year Built: {year_built}")
+            logger.debug(f"[DEBUG] Year Built: {year_built}")
 
             # HOA Fee
             # 'hoa' may be explicitly set to null which breaks chained .get calls
@@ -213,7 +213,7 @@ class PropertyAPI:
                 hoa_fee = search_details_any(r'Association Fee: (\d+)')
             if not hoa_fee:
                 hoa_fee = 'Information not available'
-            logger.info(f"[DEBUG] HOA Fee: {hoa_fee}")
+            logger.debug(f"[DEBUG] HOA Fee: {hoa_fee}")
 
             # Property Type
             property_type = description.get('type') or description.get('sub_type')
@@ -229,7 +229,7 @@ class PropertyAPI:
                             break
             if not property_type:
                 property_type = 'Information not available'
-            logger.info(f"[DEBUG] Property Type: {property_type}")
+            logger.debug(f"[DEBUG] Property Type: {property_type}")
 
             # Neighborhood
             neighborhood = None
@@ -248,7 +248,7 @@ class PropertyAPI:
                             break
             if not neighborhood:
                 neighborhood = 'Information not available'
-            logger.info(f"[DEBUG] Neighborhood: {neighborhood}")
+            logger.debug(f"[DEBUG] Neighborhood: {neighborhood}")
 
             # Photos and floor plans
             photos = []
@@ -299,7 +299,7 @@ class PropertyAPI:
                         if listing_url:
                             break
             
-            logger.info(f"[DEBUG] Found listing URL in API response: {listing_url}")
+            logger.debug(f"[DEBUG] Found listing URL in API response: {listing_url}")
 
             details = {
                 'address': address or 'Information not available',
@@ -321,7 +321,7 @@ class PropertyAPI:
                 'floor_plans': floor_plans,
                 'listing_url': listing_url
             }
-            logger.info(f"[DEBUG] Extracted details: beds={bedrooms}, baths={bathrooms}, sqft={sqft}, year={year_built}, price={price}")
+            logger.debug(f"[DEBUG] Extracted details: beds={bedrooms}, baths={bathrooms}, sqft={sqft}, year={year_built}, price={price}")
             return details
         except Exception as e:
             logger.error(f"Error in get_property_details: {e}", exc_info=True)
@@ -333,10 +333,10 @@ class PropertyAPI:
             if not self.api_key:
                 return {"images": [], "floor_plans": []}
 
-            print(f"Fetching photos for property ID: {property_id}")
+            logger.info("Fetching photos for property ID: %s", property_id)
             res = self._make_request("/propertyPhotos", {"id": property_id})
-            print("\n[DEBUG] /propertyPhotos API response:")
-            print(json.dumps(res, indent=2))
+            logger.debug("[DEBUG] /propertyPhotos API response:")
+            logger.debug("propertyPhotos response: %s", json.dumps(res))
             if not res or ("photos" not in res and "data" not in res):
                 return {"images": [], "floor_plans": []}
 
@@ -355,7 +355,7 @@ class PropertyAPI:
             return {"images": all_imgs, "floor_plans": floor_plans}
             
         except Exception as e:
-            print(f"Error getting property photos: {e}")
+            logger.error("Error getting property photos: %s", e)
             return {"images": [], "floor_plans": []}
 
     # Remove search_property method and all /search endpoint usage
@@ -1224,17 +1224,17 @@ class PropertyAPI:
         try:
             address_no_unit = self._remove_unit_part(address)
             slug = self._slugify_address(address_no_unit)
-            print(f"[DEBUG] _realtor_site_search_url: slugified address: {slug}")
+            logger.debug(f"[DEBUG] _realtor_site_search_url: slugified address: {slug}")
             if not slug:
                 return None
             search_url = f"https://www.realtor.com/realestateandhomes-search/{slug}"
-            print(f"[DEBUG] _realtor_site_search_url: search_url: {search_url}")
+            logger.debug(f"[DEBUG] _realtor_site_search_url: search_url: {search_url}")
             headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
 
             # Retry up to 3 times with small back-off when Realtor blocks (429) or temporary error
             for attempt in range(3):
                 resp = requests.get(search_url, headers=headers, timeout=10)
-                print(f"[DEBUG] _realtor_site_search_url: Attempt {attempt+1}, status: {resp.status_code}")
+                logger.debug(f"[DEBUG] _realtor_site_search_url: Attempt {attempt+1}, status: {resp.status_code}")
                 if resp.status_code == 200:
                     break
                 if resp.status_code in {429, 403, 502} and attempt < 2:
@@ -1246,16 +1246,16 @@ class PropertyAPI:
                 href = a.get('href', '')
                 if '/realestateandhomes-detail/' in href:
                     if href.startswith('http'):
-                        print(f"[DEBUG] _realtor_site_search_url: Found detail link: {href}")
+                        logger.debug(f"[DEBUG] _realtor_site_search_url: Found detail link: {href}")
                         return href
                     else:
                         full_url = 'https://www.realtor.com' + href
-                        print(f"[DEBUG] _realtor_site_search_url: Found detail link: {full_url}")
+                        logger.debug(f"[DEBUG] _realtor_site_search_url: Found detail link: {full_url}")
                         return full_url
-            print("[DEBUG] _realtor_site_search_url: No detail link found on search page.")
+            logger.debug("[DEBUG] _realtor_site_search_url: No detail link found on search page.")
             return None
         except Exception as e:
-            print(f"[DEBUG] _realtor_site_search_url: Exception: {e}")
+            logger.debug(f"[DEBUG] _realtor_site_search_url: Exception: {e}")
             return None
 
     def _scrape_realtor_url_duckduckgo(self, address: str) -> Optional[str]:
@@ -1281,16 +1281,16 @@ class PropertyAPI:
                             variations.append(v.replace(val, val[0] + ' '))
             # Remove duplicates
             variations = list(dict.fromkeys(variations))
-            print(f"[DEBUG] _scrape_realtor_url_duckduckgo: Trying variations: {variations}")
+            logger.debug(f"[DEBUG] _scrape_realtor_url_duckduckgo: Trying variations: {variations}")
             for v in variations:
                 if not v or v in tried:
                     continue
                 tried.add(v)
                 query = urllib.parse.quote_plus(f"{v} site:realtor.com/realestateandhomes-detail")
                 url = f"https://duckduckgo.com/html/?q={query}"
-                print(f"[DEBUG] _scrape_realtor_url_duckduckgo: Searching DuckDuckGo with URL: {url}")
+                logger.debug(f"[DEBUG] _scrape_realtor_url_duckduckgo: Searching DuckDuckGo with URL: {url}")
                 resp = requests.get(url, headers=headers, timeout=10)
-                print(f"[DEBUG] _scrape_realtor_url_duckduckgo: DuckDuckGo status: {resp.status_code}")
+                logger.debug(f"[DEBUG] _scrape_realtor_url_duckduckgo: DuckDuckGo status: {resp.status_code}")
                 if resp.status_code != 200:
                     continue
                 soup = BeautifulSoup(resp.text, "html.parser")
@@ -1300,14 +1300,14 @@ class PropertyAPI:
                         real_url = urllib.parse.parse_qs(urllib.parse.urlparse(href).query).get('uddg', [None])[0]
                     else:
                         real_url = href
-                    print(f"[DEBUG] _scrape_realtor_url_duckduckgo: Found link: {real_url}")
+                    logger.debug(f"[DEBUG] _scrape_realtor_url_duckduckgo: Found link: {real_url}")
                     if real_url and 'realtor.com/realestateandhomes-detail' in real_url:
-                        print(f"[DEBUG] _scrape_realtor_url_duckduckgo: Returning detail link: {real_url}")
+                        logger.debug(f"[DEBUG] _scrape_realtor_url_duckduckgo: Returning detail link: {real_url}")
                         return real_url
-            print("[DEBUG] _scrape_realtor_url_duckduckgo: No detail link found in DuckDuckGo results.")
+            logger.debug("[DEBUG] _scrape_realtor_url_duckduckgo: No detail link found in DuckDuckGo results.")
             return None
         except Exception as e:
-            print(f"[DEBUG] _scrape_realtor_url_duckduckgo: Exception: {e}")
+            logger.debug(f"[DEBUG] _scrape_realtor_url_duckduckgo: Exception: {e}")
             return None
 
     # NEW: SerpAPI search
