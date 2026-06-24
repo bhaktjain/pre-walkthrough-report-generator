@@ -4,7 +4,6 @@ from typing import Dict, Any, Optional
 import time
 import http.client
 import json
-from openai import OpenAI
 import urllib.parse
 import logging
 
@@ -20,68 +19,48 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 class PropertyAPI:
-    def __init__(self, api_key: str, openai_api_key: str = None, serpapi_key: str = None):
+    def __init__(self, api_key: str, serpapi_key: str = None):
         self.api_key = api_key
-        self.openai_api_key = openai_api_key
         self.serpapi_key = serpapi_key
         self.host = "us-real-estate-listings.p.rapidapi.com"
         self.headers = {
             'x-rapidapi-key': api_key,
             'x-rapidapi-host': self.host
         }
-        if openai_api_key:
-            self.openai_client = OpenAI(api_key=openai_api_key)
         logger.info("PropertyAPI initialized")
 
     def _make_request(self, endpoint: str, params: Dict[str, str] = None) -> Optional[Dict]:
         """Make a request to the RapidAPI endpoint"""
+        conn = None
         try:
             conn = http.client.HTTPSConnection(self.host)
-            
+
             # Build query string if params provided
             query = ""
             if params:
                 # URL encode each parameter value
                 encoded_params = {k: urllib.parse.quote(str(v)) for k, v in params.items()}
                 query = "?" + "&".join(f"{k}={v}" for k, v in encoded_params.items())
-            
+
             conn.request("GET", f"{endpoint}{query}", headers=self.headers)
             res = conn.getresponse()
             data = res.read()
-            
+
             if res.status != 200:
-                print(f"Error from API: {res.status}")
-                print(f"Response: {data.decode('utf-8')}")
+                logger.error("Error from RapidAPI: HTTP %s", res.status)
+                logger.debug("Response body: %s", data.decode('utf-8', errors='replace'))
                 return None
-                
+
             return json.loads(data.decode('utf-8'))
-            
+
         except Exception as e:
-            print(f"Error making request: {e}")
+            logger.error("Error making RapidAPI request: %s", e)
             return None
         finally:
-            conn.close()
-
-    def format_address_for_search(self, address: str) -> str:
-        """Format address for property search"""
-        # Remove quotes and clean whitespace
-        address = address.replace('"', '').strip()
-        
-        # Extract components
-        match = re.match(r'(\d+)\s+West\s+(\d+)(?:st|nd|rd|th)\s+Street(?:\s*,\s*Apt\s+\w+)?(?:\s*,\s*New\s+York(?:\s*,\s*NY)?)?', address, re.IGNORECASE)
-        if match:
-            street_num = match.group(1)
-            street_name = match.group(2)
-            return f"{street_num} W {street_name}th St, New York, NY"
-        
-        return address
-
-    def get_property_id_from_openai(self, address: str) -> Optional[str]:
-        """Use OpenAI to get the property ID or MLS ID - Currently disabled as OpenAI doesn't have real-time MLS access"""
-        # OpenAI doesn't actually have access to real-time MLS databases or web search
-        # This method is disabled to avoid false expectations
-        logger.info("OpenAI property ID lookup is disabled - OpenAI doesn't have real-time MLS access")
-        return None
+            # conn may be None if HTTPSConnection() itself raised; guard before closing
+            # so we don't mask the original error with an UnboundLocalError.
+            if conn is not None:
+                conn.close()
 
     def get_property_details(self, property_id: str) -> Dict[str, Any]:
         """Get detailed property information using property ID (live RapidAPI)."""
@@ -1344,20 +1323,20 @@ class PropertyAPI:
                 "num": "10",
                 "api_key": self.serpapi_key,
             }
-            print(f"[DEBUG] _serpapi_realtor_url: Query params: {params}")
+            # Log only the query — never the params dict (it contains the SerpAPI api_key).
+            logger.debug("_serpapi_realtor_url query: %s", params["q"])
             resp = requests.get("https://serpapi.com/search.json", params=params, timeout=10)
-            print(f"[DEBUG] _serpapi_realtor_url: SerpAPI status: {resp.status_code}")
+            logger.debug("_serpapi_realtor_url SerpAPI status: %s", resp.status_code)
             if resp.status_code != 200:
                 return None
             data = resp.json()
             for res in data.get("organic_results", []):
                 link = res.get("link")
-                print(f"[DEBUG] _serpapi_realtor_url: Found link: {link}")
                 if link and 'realtor.com/realestateandhomes-detail' in link:
-                    print(f"[DEBUG] _serpapi_realtor_url: Returning detail link: {link}")
+                    logger.debug("_serpapi_realtor_url returning detail link: %s", link)
                     return link
-            print("[DEBUG] _serpapi_realtor_url: No detail link found in SerpAPI results.")
+            logger.debug("_serpapi_realtor_url: no detail link found in SerpAPI results")
             return None
         except Exception as e:
-            print(f"[DEBUG] _serpapi_realtor_url: Exception: {e}")
+            logger.debug("_serpapi_realtor_url exception: %s", e)
             return None

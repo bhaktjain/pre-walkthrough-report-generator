@@ -28,7 +28,7 @@ def _run_pipeline(transcript_text: str) -> bytes:
     cfg = Config()
 
     # Process transcript text
-    processor = TranscriptProcessor(cfg.openai_api_key)
+    processor = TranscriptProcessor(cfg.anthropic_api_key, cfg.claude_model)
     template = processor.process_transcript_text(transcript_text)
 
     # Extract & clean address from transcript text
@@ -43,7 +43,7 @@ def _run_pipeline(transcript_text: str) -> bytes:
         if not re.search(r",\s*(NY|New York|Brooklyn|Manhattan|Queens|Bronx)", address_parts, re.I):
             address_parts += ", New York, NY"
 
-    property_api = PropertyAPI(cfg.rapidapi_key, cfg.openai_api_key, cfg.serpapi_key)
+    property_api = PropertyAPI(cfg.rapidapi_key, cfg.serpapi_key)
 
     # Realtor URL & property ID (fully dynamic)
     realtor_url: Optional[str] = property_api.get_realtor_link(address_parts)

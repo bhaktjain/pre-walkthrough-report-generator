@@ -1,9 +1,12 @@
 import os
 import sys
+import logging
 from pathlib import Path
 import re
 import json
 from .config import Config
+
+logger = logging.getLogger(__name__)
 from .transcript_processor import TranscriptProcessor
 from .property_api import PropertyAPI
 from .document_generator import DocumentGenerator
@@ -54,8 +57,8 @@ def main():
     # Initialize components
     config = Config()
     doc_generator = DocumentGenerator()
-    transcript_processor = TranscriptProcessor(config.openai_api_key)
-    property_api = PropertyAPI(config.rapidapi_key, config.openai_api_key, config.serpapi_key)
+    transcript_processor = TranscriptProcessor(config.anthropic_api_key, config.claude_model)
+    property_api = PropertyAPI(config.rapidapi_key, config.serpapi_key)
 
     def resolve_transcript_paths(args) -> list[Path]:
         """Return a list of transcript Path objects to process based on CLI args."""
@@ -152,13 +155,11 @@ def main():
 
             # Always fetch property details from /v2/property
             property_details = property_api.get_property_details(property_id) if property_id else {}
-            print("\n[DEBUG] property_details returned from property_api:")
-            print(json.dumps(property_details, indent=2, default=str))
+            logger.debug("property_details returned: %s", json.dumps(property_details, default=str))
 
             # Always fetch images and floor plans from /propertyPhotos
             property_photos = property_api.get_property_photos(property_id) if property_id else {"images": [], "floor_plans": []}
-            print("\n[DEBUG] property_photos returned from property_api:")
-            print(json.dumps(property_photos, indent=2, default=str))
+            logger.debug("property_photos returned: %s", json.dumps(property_photos, default=str))
 
             # Always use canonical Realtor.com URL if possible
             canonical_realtor_url = property_api.build_realtor_url(property_id, address) if property_id and address else realtor_url
@@ -174,11 +175,7 @@ def main():
                 "transcript_info": transcript_info
             }
 
-            print("\n[DEBUG] property_details passed to DocumentGenerator:")
-            print(json.dumps(property_details, indent=2, default=str))
-            print("\n[DEBUG] property_photos passed to DocumentGenerator:")
-            print(json.dumps(property_photos, indent=2, default=str))
-            print(f"[DEBUG] Canonical Realtor.com URL: {canonical_realtor_url}")
+            logger.debug("Canonical Realtor.com URL: %s", canonical_realtor_url)
 
             save_json(final_data, f"final_data_{transcript_path.stem}.json")
 

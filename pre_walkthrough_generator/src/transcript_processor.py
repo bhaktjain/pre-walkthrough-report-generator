@@ -1,65 +1,120 @@
-from openai import OpenAI
 import json
-from typing import Dict, Any, Optional
+import logging
 import re
+from typing import Any, Dict
+
+from anthropic import Anthropic
+
+logger = logging.getLogger(__name__)
+
+# Default Claude model. Override per-instance (e.g. from config) without touching call sites.
+DEFAULT_MODEL = "claude-opus-4-8"
+
+# Adaptive thinking improves extraction accuracy on nuanced consultations (budget
+# inference, red-flag detection). It adds some latency; set to False for the fastest,
+# cheapest extraction.
+USE_ADAPTIVE_THINKING = True
+
 
 class TranscriptProcessor:
-    def __init__(self, api_key: str):
-        self.client = OpenAI(api_key=api_key)
+    def __init__(self, api_key: str, model: str = DEFAULT_MODEL):
+        # max_retries/timeout make the client resilient to transient rate-limit/5xx/network errors.
+        self.client = Anthropic(api_key=api_key, max_retries=3, timeout=120.0)
+        self.model = model or DEFAULT_MODEL
+
+    # ------------------------------------------------------------------ helpers
+    @staticmethod
+    def _message_text(response) -> str:
+        """Concatenate the text of every text block in a Messages API response.
+
+        Iterating the blocks (rather than indexing ``content[0]``) is robust to
+        leading ``thinking`` blocks when adaptive thinking is enabled.
+        """
+        return "".join(
+            block.text for block in response.content if getattr(block, "type", None) == "text"
+        ).strip()
+
+    @staticmethod
+    def _parse_json(text: str) -> Dict[str, Any]:
+        """Tolerant JSON parse: strip markdown code fences / surrounding prose."""
+        if not text:
+            raise ValueError("empty model response")
+        cleaned = text.strip()
+        if cleaned.startswith("```"):
+            cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+            cleaned = re.sub(r"\s*```$", "", cleaned)
+        try:
+            return json.loads(cleaned)
+        except json.JSONDecodeError:
+            # Fall back to the first balanced-looking {...} block.
+            match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+            if match:
+                return json.loads(match.group(0))
+            raise
+
+    @classmethod
+    def _deep_merge(cls, base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+        """Overlay ``override`` onto a copy of ``base`` recursively.
+
+        Guarantees every key the downstream report generator expects exists, even
+        when the model omits a section, while preserving any extra keys the model
+        returns.
+        """
+        result = dict(base)
+        for key, value in (override or {}).items():
+            if isinstance(value, dict) and isinstance(result.get(key), dict):
+                result[key] = cls._deep_merge(result[key], value)
+            elif value is not None:
+                result[key] = value
+        return result
 
     def clean_transcript(self, transcript: str) -> str:
         """Clean the transcript by removing timestamps and formatting"""
-        # Split into lines and clean
         lines = transcript.split('\n')
         cleaned_lines = []
-        
+
         for line in lines:
-            # Skip empty lines
             if not line.strip():
                 continue
-                
+
             # Remove JSON formatting artifacts
             line = line.replace('{"":"', '').replace('"}', '')
-            
-            # Extract the actual message
+
+            # Extract the actual message (drop a leading "timestamp |" prefix)
             parts = line.split('|', 1)
             if len(parts) > 1:
-                # Remove timestamp
                 line = parts[0].strip()
-            
-            # Remove phone number format
+
+            # Remove phone numbers
             line = re.sub(r'\(\d{3}\)\s*\d{3}-\d{4}', '', line)
-            # Remove +1 phone format
             line = re.sub(r'\+1\d{10}', '', line)
-            
-            # Clean up the line
+
             line = line.strip()
             if line:
                 cleaned_lines.append(line)
-        
+
         return '\n'.join(cleaned_lines)
 
     def extract_info(self, transcript: str) -> Dict[str, Any]:
         """Extract structured information from transcript"""
-        # Clean the transcript first
         cleaned_transcript = transcript.strip()
-        
+
         # Validate transcript has meaningful content
         if not cleaned_transcript:
             logger.warning("Empty transcript provided")
             return self._get_empty_template()
-        
+
         # Check for minimal consultation indicators
         consultation_indicators = [
             'renovation', 'remodel', 'construction', 'project', 'budget', 'cost',
             'kitchen', 'bathroom', 'bedroom', 'addition', 'contractor', 'architect'
         ]
-        
+
         transcript_lower = cleaned_transcript.lower()
         if not any(indicator in transcript_lower for indicator in consultation_indicators):
             logger.warning("Transcript doesn't appear to contain renovation consultation content")
             return self._get_empty_template()
-        
+
         try:
             # Directly extract renovation and client information (no property ID)
             info_prompt = """Extract comprehensive structured information from this renovation/construction consultation transcript. This could be any type of project: kitchen renovation, bathroom remodel, home addition, whole-house renovation, commercial project, etc. Pay special attention to budget numbers, timelines, specific project requirements, and client constraints.
@@ -194,33 +249,48 @@ CRITICAL EXTRACTION RULES:
 
 Process this transcript and return ONLY the JSON:"""
 
-            print("\nExtracting renovation information...")
-            info_response = self.client.chat.completions.create(
-                model="gpt-4o",  # Use the latest and most capable model
-                messages=[
-                    {"role": "system", "content": "You are an expert renovation consultant assistant that extracts comprehensive, detailed information from any type of renovation or construction consultation transcript. You work with all project types: kitchen renovations, bathroom remodels, additions, whole-house renovations, commercial projects, etc. You pay close attention to budget numbers, timelines, specific requirements, and client constraints regardless of project scope."},
-                    {"role": "user", "content": info_prompt},
-                    {"role": "user", "content": cleaned_transcript}
-                ],
-                temperature=0,
-                max_tokens=4000,  # Increase token limit for more detailed extraction
-                response_format={"type": "json_object"}
+            system_prompt = (
+                "You are an expert renovation consultant assistant that extracts comprehensive, "
+                "detailed information from any type of renovation or construction consultation "
+                "transcript. You work with all project types: kitchen renovations, bathroom remodels, "
+                "additions, whole-house renovations, commercial projects, etc. You pay close attention "
+                "to budget numbers, timelines, specific requirements, and client constraints regardless "
+                "of project scope. Respond with ONLY the JSON object — no markdown fences, no prose."
             )
-            
-            # Get the response content
-            response_text = info_response.choices[0].message.content
-            print("\nAPI Response:")
-            print(response_text)
-            
-            # Extract the JSON response and convert to template
-            data = json.loads(response_text)
-            
-            return data
-            
+
+            logger.info("Extracting renovation information via %s", self.model)
+            kwargs = dict(
+                model=self.model,
+                max_tokens=16000,
+                system=system_prompt,
+                messages=[
+                    {"role": "user", "content": info_prompt},
+                    {"role": "user", "content": cleaned_transcript},
+                ],
+            )
+            if USE_ADAPTIVE_THINKING:
+                kwargs["thinking"] = {"type": "adaptive"}
+
+            response = self.client.messages.create(**kwargs)
+
+            if response.stop_reason == "max_tokens":
+                logger.error(
+                    "Extraction hit max_tokens before completing — JSON is likely truncated. "
+                    "Returning empty template; increase max_tokens if this recurs."
+                )
+                return self._get_empty_template()
+
+            response_text = self._message_text(response)
+            logger.debug("Extraction response: %s", response_text)
+
+            data = self._parse_json(response_text)
+            # Merge over the canonical template so every downstream key exists.
+            return self._deep_merge(self._get_empty_template(), data)
+
         except Exception as e:
-            print(f"\nError extracting information: {e}")
+            logger.error("Error extracting information: %s", e)
             return self._get_empty_template()
-    
+
     def _get_empty_template(self) -> Dict[str, Any]:
         """Return an empty template structure when no meaningful transcript is provided"""
         return {
@@ -325,43 +395,41 @@ Process this transcript and return ONLY the JSON:"""
     def extract_address(self, transcript: str) -> str:
         prompt = """
         Extract the complete property address mentioned in this renovation consultation transcript.
-        
+
         Look for the property address that the client wants renovated. This will typically be mentioned early in the conversation.
-        
+
         Rules:
         • Return the EXACT address as mentioned, preserving the original format
         • Include apartment/unit numbers if mentioned (e.g., "#M7", "Apt 3B", "Unit 5")
         • Include the full city, state, and ZIP code
         • Do NOT modify or "correct" street names unless there's an obvious typo
         • Do NOT change abbreviations unless they're clearly wrong
-        
+
         Examples of good output:
         - "268 Babbitt Road #M7, Bedford, NY 10507"
         - "1001 Unquowa Road, Fairfield, CT 06824"
         - "123 Main Street, Apt 4B, Brooklyn, NY 11201"
-        
+
         Output ONLY the address, nothing else. If no clear address is found, output "NONE".
         """
 
         try:
-            response = self.client.chat.completions.create(
-                model="gpt-4o",  # Use the latest model
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=512,
+                system="You are a helpful assistant that extracts addresses from text and corrects spelling mistakes in street names using context and common street names. Output only the address.",
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that extracts addresses from text and corrects spelling mistakes in street names using context and common street names."},
                     {"role": "user", "content": prompt},
                     {"role": "user", "content": transcript}
                 ],
-                temperature=0,
-                max_tokens=150
             )
-            addr = response.choices[0].message.content.strip()
+            addr = self._message_text(response)
             if addr and addr.lower() != 'none' and len(addr) > 8:
                 return addr
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("LLM address extraction failed, falling back to regex: %s", e)
 
         # Fallback: regex for NYC-style addresses with fuzzy street name correction
-        import re
         from difflib import get_close_matches
         # List of common Brooklyn/NYC street names for fuzzy correction
         common_streets = [
@@ -376,7 +444,6 @@ Process this transcript and return ONLY the JSON:"""
                 # Fuzzy correct the street name
                 street_parts = street.split()
                 if len(street_parts) >= 2:
-                    # Find the part that is likely the street name
                     for i in range(1, len(street_parts)):
                         candidate = street_parts[i].capitalize()
                         matches = get_close_matches(candidate, common_streets, n=1, cutoff=0.8)
@@ -447,31 +514,31 @@ Process this transcript and return ONLY the JSON:"""
                 "notable_comments": []
             }
         }
+
+        Respond with ONLY the JSON object — no markdown fences, no prose.
         """
 
         try:
-            response = self.client.chat.completions.create(
-                model="gpt-4o",  # Use the latest model
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=2000,
+                system="You are a helpful assistant that analyzes client behavior and preferences. Respond with only JSON.",
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that analyzes client behavior and preferences."},
                     {"role": "user", "content": prompt},
                     {"role": "user", "content": transcript}
                 ],
-                temperature=0,
-                max_tokens=1500
             )
-            
-            return json.loads(response.choices[0].message.content)
-            
+            return self._parse_json(self._message_text(response))
+
         except Exception as e:
-            print(f"Error analyzing client: {e}")
+            logger.error("Error analyzing client: %s", e)
             return {}
 
     def process_transcript_text(self, transcript: str) -> Dict[str, Any]:
         """High-level helper used by serverless handler.
 
         1. Clean raw transcript (remove timestamps, etc.)
-        2. Extract structured information via GPT (extract_info)
+        2. Extract structured information via the LLM (extract_info)
         3. Ensure the template contains a property address – if missing, try address extraction.
         """
         # Step 1 – basic cleaning so the LLM prompt is smaller
@@ -480,15 +547,15 @@ Process this transcript and return ONLY the JSON:"""
         # Step 2 – get structured info
         info_data = self.extract_info(cleaned)
 
-        # Step 3 – populate address if the LLM didn’t include it
+        # Step 3 – populate the top-level address if the LLM didn't include one.
+        # (The extraction schema exposes the address as the top-level ``property_address``
+        # string — there is no ``property_info.address.full`` path.)
         try:
-            if not info_data.get("property_info") or not info_data["property_info"].get("address") or not info_data["property_info"]["address"].get("full"):
+            if not info_data.get("property_address"):
                 addr = self.extract_address(cleaned)
                 if addr:
-                    # mutate info_data in-place so downstream code sees the address
-                    info_data["property_info"]["address"]["full"] = addr  # type: ignore[attr-defined]
-        except Exception:
-            # Fail silently – downstream code will fall back to empty address handling
-            pass
+                    info_data["property_address"] = addr
+        except Exception as e:
+            logger.warning("Address backfill failed: %s", e)
 
         return info_data

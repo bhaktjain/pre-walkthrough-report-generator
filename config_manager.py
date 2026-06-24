@@ -24,7 +24,7 @@ class ConfigManager:
                 # Create default config
                 default_config = {
                     "api_keys": {
-                        "openai": "",
+                        "anthropic": "",
                         "rapidapi": "",
                         "serpapi": ""
                     },
@@ -77,10 +77,10 @@ class ConfigManager:
         config[keys[-1]] = value
         self.save_config()
     
-    def update_api_keys(self, openai_key: str = None, rapidapi_key: str = None, serpapi_key: str = None):
+    def update_api_keys(self, anthropic_key: str = None, rapidapi_key: str = None, serpapi_key: str = None):
         """Update API keys dynamically"""
-        if openai_key:
-            self.set("api_keys.openai", openai_key)
+        if anthropic_key:
+            self.set("api_keys.anthropic", anthropic_key)
         if rapidapi_key:
             self.set("api_keys.rapidapi", rapidapi_key)
         if serpapi_key:
