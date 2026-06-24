@@ -1553,6 +1553,81 @@ def get_neighborhood_from_address(address: str, use_geocoding: bool = False) -> 
     return None
 
 
+# Full US state name -> 2-letter code (for non-NYC "City, ST" locality keys).
+_STATE_ABBREV = {
+    'alabama': 'AL', 'alaska': 'AK', 'arizona': 'AZ', 'arkansas': 'AR', 'california': 'CA',
+    'colorado': 'CO', 'connecticut': 'CT', 'delaware': 'DE', 'district of columbia': 'DC',
+    'florida': 'FL', 'georgia': 'GA', 'hawaii': 'HI', 'idaho': 'ID', 'illinois': 'IL',
+    'indiana': 'IN', 'iowa': 'IA', 'kansas': 'KS', 'kentucky': 'KY', 'louisiana': 'LA',
+    'maine': 'ME', 'maryland': 'MD', 'massachusetts': 'MA', 'michigan': 'MI', 'minnesota': 'MN',
+    'mississippi': 'MS', 'missouri': 'MO', 'montana': 'MT', 'nebraska': 'NE', 'nevada': 'NV',
+    'new hampshire': 'NH', 'new jersey': 'NJ', 'new mexico': 'NM', 'new york': 'NY',
+    'north carolina': 'NC', 'north dakota': 'ND', 'ohio': 'OH', 'oklahoma': 'OK', 'oregon': 'OR',
+    'pennsylvania': 'PA', 'rhode island': 'RI', 'south carolina': 'SC', 'south dakota': 'SD',
+    'tennessee': 'TN', 'texas': 'TX', 'utah': 'UT', 'vermont': 'VT', 'virginia': 'VA',
+    'washington': 'WA', 'west virginia': 'WV', 'wisconsin': 'WI', 'wyoming': 'WY',
+}
+_STATE_CODES = set(_STATE_ABBREV.values())
+
+
+def _abbrev_state(state) -> Optional[str]:
+    if not state:
+        return None
+    s = str(state).strip()
+    if s.upper() in _STATE_CODES:
+        return s.upper()
+    return _STATE_ABBREV.get(s.lower())
+
+
+def _locality_from_address_string(address: str) -> Optional[str]:
+    """Parse 'City, ST' from a full address like 'Street, City, ST 07436' (no network)."""
+    parts = [p.strip() for p in str(address).split(',') if p.strip()]
+    if len(parts) < 2:
+        return None
+    for i, p in enumerate(parts):
+        m = re.search(r'\b([A-Za-z]{2})\b(?:\s+\d{5}(?:-\d{4})?)?\s*$', p)
+        if not m or m.group(1).upper() not in _STATE_CODES:
+            continue
+        before = p[:m.start()].strip().rstrip(',').strip()
+        city = before if before else (parts[i - 1] if i > 0 else None)
+        if city:
+            return f"{city.title()}, {m.group(1).upper()}"
+    return None
+
+
+def get_locality(address: str, use_geocoding: bool = False) -> Optional[str]:
+    """Return a matching 'locality' key for any address.
+
+    NYC addresses resolve to their neighborhood (e.g. 'Upper East Side'); every
+    other location resolves to 'City, ST' (e.g. 'Oakland, NJ', 'Greenwich, CT',
+    'East Hampton, NY', 'Miami, FL'). This lets neighboring-project matching work
+    nationwide while keeping NYC's finer neighborhood granularity.
+    """
+    if not address:
+        return None
+    # 1. NYC neighborhood (most precise inside the five boroughs).
+    hood = get_neighborhood_from_address(address, use_geocoding=False)
+    if hood:
+        return hood
+    # 2. Town/city + state parsed straight from the address string (no network).
+    loc = _locality_from_address_string(address)
+    if loc:
+        return loc
+    # 3. Geocode (cached, or live if requested), then neighborhood or City, ST.
+    cache = _load_geocode_cache()
+    ck = _clean_address(address)
+    geo = cache.get(ck) if ck in cache else (geocode_address(address) if use_geocoding else None)
+    if geo:
+        hood = _neighborhood_from_geocode(geo)
+        if hood:
+            return hood
+        city = geo.get('city') or geo.get('town') or geo.get('village') or geo.get('suburb')
+        state = _abbrev_state(geo.get('state'))
+        if city and state:
+            return f"{str(city).title()}, {state}"
+    return None
+
+
 def _neighborhood_from_street(address: str) -> Optional[str]:
     """Determine neighborhood directly from street address without going through ZIP."""
     if not address:
@@ -1683,7 +1758,9 @@ def enrich_deals_with_neighborhoods(deals: list, use_geocoding: bool = True) -> 
         if not name:
             continue
 
-        hood = get_neighborhood_from_address(name, use_geocoding=use_geocoding)
+        # Locality = NYC neighborhood for the five boroughs, else "City, ST"
+        # (so non-NYC deals — NJ/CT/Miami/Westchester/Hamptons — are matchable).
+        hood = get_locality(name, use_geocoding=use_geocoding)
         if hood:
             deal["Neighborhood"] = hood
             matched += 1

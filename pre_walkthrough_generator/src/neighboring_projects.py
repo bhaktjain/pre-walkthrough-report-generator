@@ -19,16 +19,19 @@ logger = logging.getLogger(__name__)
 try:
     from nyc_neighborhoods import (
         get_neighborhood_from_address,
+        get_locality,
         enrich_deals_with_neighborhoods,
     )
 except ImportError:
     try:
         from pre_walkthrough_generator.src.nyc_neighborhoods import (
             get_neighborhood_from_address,
+            get_locality,
             enrich_deals_with_neighborhoods,
         )
     except ImportError as _imp_err:  # pragma: no cover
         get_neighborhood_from_address = None
+        get_locality = None
         enrich_deals_with_neighborhoods = None
         logger.error(
             "Could not import nyc_neighborhoods — neighborhood matching disabled: %s",
@@ -188,14 +191,15 @@ class NeighboringProjectsManager:
 
         deals = cache_data.get("deals", [])
 
-        # Determine the target neighborhood via the same ZIP-based table used to
-        # tag the cached deals, so both sides share one vocabulary.
+        # Determine the target locality with the same resolver used to tag the
+        # cached deals, so both sides share one vocabulary: a NYC neighborhood
+        # inside the five boroughs, else "City, ST" (NJ/CT/Miami/Westchester/Hamptons).
         zip_neighborhood = None
-        if get_neighborhood_from_address is not None:
+        if get_locality is not None:
             try:
-                zip_neighborhood = get_neighborhood_from_address(target_address, use_geocoding=False)
+                zip_neighborhood = get_locality(target_address, use_geocoding=False)
             except Exception as e:
-                logger.error(f"Neighborhood lookup failed for {target_address}: {e}")
+                logger.error(f"Locality lookup failed for {target_address}: {e}")
         else:
             logger.warning(
                 "nyc_neighborhoods unavailable — falling back to same-building matching only"
