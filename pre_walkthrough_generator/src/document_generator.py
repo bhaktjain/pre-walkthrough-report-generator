@@ -150,6 +150,15 @@ class DocumentGenerator:
             return None
 
     @staticmethod
+    def _zillow_search_url(address) -> Optional[str]:
+        """A Zillow listing/search URL for an address (no API needed; Zillow
+        resolves the address query to the listing, which often has a floor plan)."""
+        if not address:
+            return None
+        from urllib.parse import quote
+        return "https://www.zillow.com/homes/" + quote(str(address).strip()) + "_rb/"
+
+    @staticmethod
     def _is_meaningful(value) -> bool:
         """True if a value carries real content.
 
@@ -558,7 +567,14 @@ class DocumentGenerator:
         if realtor_url:
             self._add_hyperlink(link_para, 'View Listing', realtor_url)
         else:
-            link_para.add_run('N/A')
+            link_para.add_run('Not found on Realtor.com')
+
+        # When the property isn't on Realtor, link the Zillow listing as a fallback.
+        zillow_url = data.get('zillow_url') or self._zillow_search_url(data.get('property_address'))
+        if not realtor_url and zillow_url:
+            zpara = self.doc.add_paragraph()
+            zpara.add_run('• Zillow: ').bold = True
+            self._add_hyperlink(zpara, 'View Listing', zillow_url)
 
         # Floor Plan section
         self._heading('Floor Plan', level=2)
@@ -566,7 +582,13 @@ class DocumentGenerator:
         floor_plans = floor_plans_data.get('floor_plans', []) or property_details.get('floor_plans', [])
 
         if not floor_plans:
-            self.doc.add_paragraph('No floor plans available.')
+            zillow_url = data.get('zillow_url') or self._zillow_search_url(data.get('property_address'))
+            if zillow_url:
+                fp = self.doc.add_paragraph()
+                fp.add_run('No floor plan from Realtor. Check the Zillow listing (often includes a floor plan): ')
+                self._add_hyperlink(fp, 'View on Zillow', zillow_url)
+            else:
+                self.doc.add_paragraph('No floor plans available.')
             return
 
         for plan in floor_plans:
