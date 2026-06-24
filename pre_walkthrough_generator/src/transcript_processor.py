@@ -126,6 +126,7 @@ Return ONLY valid JSON matching this exact structure (fill in only the sections 
     "client_info": {
         "names": string[],  // All client names mentioned
         "phone": string,  // Phone number if mentioned
+        "email": string,  // Client's email address if mentioned
         "profession": string,  // Client's job/profession if mentioned
         "preferences": {
             "budget_sensitivity": string,  // How price-conscious they seem
@@ -299,6 +300,7 @@ Process this transcript and return ONLY the JSON:"""
             "client_info": {
                 "names": [],
                 "phone": "",
+                "email": "",
                 "profession": "",
                 "preferences": {
                     "budget_sensitivity": "",

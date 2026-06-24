@@ -296,7 +296,7 @@ class DocumentGenerator:
                 add_desc.append(f"Systems: {', '.join(systems)}")
             goals_parts.append(f"Additional work: {', '.join(add_desc)}")
 
-        project_goals = '. '.join(goals_parts) or 'Comprehensive renovation project'
+        project_goals = '. '.join(goals_parts) if goals_parts else None
 
         # 2. Client Drivers
         drivers = []
@@ -304,7 +304,7 @@ class DocumentGenerator:
             drivers.append('layout upgrade')
         if additional.get('systems_updates'):
             drivers.append('systems modernisation')
-        client_drivers = ', '.join(drivers) or 'home improvement'
+        client_drivers = ', '.join(drivers) if drivers else None
 
         # 3. Key numbers — budget + timeline
         timeline = scope.get('timeline', {}) or {}
@@ -358,9 +358,15 @@ class DocumentGenerator:
             key_parts.append(f"Target window {duration}")
         key_numbers = '; '.join(key_parts) if key_parts else 'Key numbers TBD'
 
-        bullets = [f"1. Project Goals – {project_goals}.",
-                   f"2. Client Drivers – {client_drivers}.",
-                   f"3. Key Numbers – {key_numbers}."]
+        # Be honest when the call had no renovation scope (e.g. a scheduling call)
+        # rather than fabricating a generic "Comprehensive renovation project".
+        bullets = [
+            f"1. Project Goals – {project_goals}." if project_goals
+            else "1. Project Goals – No renovation scope was discussed in this call.",
+            f"2. Client Drivers – {client_drivers}." if client_drivers
+            else "2. Client Drivers – Not specified.",
+            f"3. Key Numbers – {key_numbers}.",
+        ]
         for text in bullets:
             para = self.doc.add_paragraph(text, style='List Bullet')
             para.paragraph_format.space_after = Pt(6)
@@ -489,6 +495,7 @@ class DocumentGenerator:
         details = [
             ('Name', names_str),
             ('Phone', client_info.get('phone') or 'N/A'),
+            ('Email', client_info.get('email') or 'N/A'),
             ('Profession', client_info.get('profession') or 'N/A'),
             ('Preferences', preferences_str),
             ('Constraints', constraints_str),
