@@ -200,8 +200,8 @@ def process_transcript_and_generate_report(transcript_path: str, address: str = 
         with open(transcript_path, 'r') as f:
             transcript = clean_transcript(f.read())
         
-        logger.info(f"Processing transcript: {transcript_path}")
-        
+        logger.info(f"Processing transcript: {transcript_path} ({len(transcript)} chars)")
+
         # Extract transcript information
         transcript_info = transcript_processor_obj.extract_info(transcript)
         logger.info("Transcript processed successfully")
@@ -215,6 +215,7 @@ def process_transcript_and_generate_report(transcript_path: str, address: str = 
             transcript_info.get('renovation_scope', {}).get('additional_work', {}).get('rooms')
         ]):
             logger.warning("No meaningful consultation data found in transcript")
+            logger.warning("Transcript preview (first 300 chars): %r", transcript[:300])
             raise Exception("The provided transcript does not contain sufficient consultation information to generate a meaningful report. Please provide a transcript from a renovation consultation that includes project details, client information, or scope of work.")
 
         # Use provided address first, then check transcript_info, then extract separately

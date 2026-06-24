@@ -99,20 +99,13 @@ class TranscriptProcessor:
         """Extract structured information from transcript"""
         cleaned_transcript = transcript.strip()
 
-        # Validate transcript has meaningful content
+        # Only short-circuit on a genuinely empty transcript. We deliberately do
+        # NOT keyword-pre-filter here: a hard keyword gate produced false negatives,
+        # rejecting real consultation transcripts (including live Power Automate
+        # ones) that simply phrased things differently. Let the model extract and
+        # let the caller decide whether the result is meaningful.
         if not cleaned_transcript:
             logger.warning("Empty transcript provided")
-            return self._get_empty_template()
-
-        # Check for minimal consultation indicators
-        consultation_indicators = [
-            'renovation', 'remodel', 'construction', 'project', 'budget', 'cost',
-            'kitchen', 'bathroom', 'bedroom', 'addition', 'contractor', 'architect'
-        ]
-
-        transcript_lower = cleaned_transcript.lower()
-        if not any(indicator in transcript_lower for indicator in consultation_indicators):
-            logger.warning("Transcript doesn't appear to contain renovation consultation content")
             return self._get_empty_template()
 
         try:
