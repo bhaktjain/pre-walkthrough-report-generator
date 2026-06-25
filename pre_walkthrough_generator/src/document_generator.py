@@ -95,6 +95,36 @@ def _table_borders(table, color_hex: str, sz: str = '4') -> None:
     tblPr.append(borders)
 
 
+def _set_fixed_widths(table, widths) -> None:
+    """Pin column widths so EVERY renderer honors them — including mobile viewers.
+
+    python-docx's ``cell.width`` only writes per-cell ``<w:tcW>``; it leaves the
+    ``<w:tblGrid>`` at its creation-time (equal) split. Under ``tblLayout=fixed``
+    many renderers — notably lightweight mobile / Quick Look viewers — size
+    columns from the grid, so without updating it they auto-fit columns to
+    content and overflow the page (the right-edge cut-off seen on phones). We
+    therefore set the grid (via column widths), each cell's tcW, and an explicit
+    total table width. ``widths`` are EMU Lengths.
+    """
+    for i, w in enumerate(widths):
+        try:
+            table.columns[i].width = w   # updates <w:gridCol> (authoritative under fixed layout)
+        except Exception:
+            pass
+    for row in table.rows:
+        for i, w in enumerate(widths):
+            if i < len(row.cells):
+                row.cells[i].width = w   # updates <w:tcW>
+    total_dxa = sum(int(int(w) / 635) for w in widths)  # 635 EMU per twip (dxa)
+    tblPr = table._tbl.tblPr
+    tblW = tblPr.find(qn('w:tblW'))
+    if tblW is None:
+        tblW = OxmlElement('w:tblW')
+        tblPr.append(tblW)
+    tblW.set(qn('w:w'), str(total_dxa))
+    tblW.set(qn('w:type'), 'dxa')
+
+
 class DocumentGenerator:
     def __init__(self):
         self.doc = Document()
@@ -426,6 +456,10 @@ class DocumentGenerator:
         sqft_display = f"{sqft} sq ft" if sqft not in (None, '', [], 'Information not available') else 'Information not available'
         year_built = safe_get(property_info, 'year_built')
         property_type = safe_get(property_info, 'property_type')
+        if isinstance(property_type, str) and property_type != 'Information not available':
+            # Humanize raw enum-style values like "single_family" / "MULTI_FAMILY".
+            if '_' in property_type or property_type.isupper() or property_type.islower():
+                property_type = property_type.replace('_', ' ').title()
         neighborhood = safe_get(property_info, 'neighborhood')
 
         details = [
@@ -618,10 +652,14 @@ class DocumentGenerator:
     def _finalize_tables(self):
         """Normalize every table for a clean, aligned, symmetric layout.
 
-        Fixed column widths (summing to the 6.5" content area on a 1"-margin
-        Letter page), tables centered, cells vertically centered, and bold
-        labels on two-column key/value tables.
+        Column widths are sized to the page's ACTUAL usable width (page width
+        minus left/right margins) and pinned into the table grid + every cell so
+        all renderers — including mobile viewers — honor them instead of
+        overflowing the page. Tables are centered, cells vertically centered, and
+        two-column key/value tables get bold, shaded labels.
         """
+        section = self.doc.sections[0]
+        usable = section.page_width - section.left_margin - section.right_margin
         for table in self.doc.tables:
             table.alignment = WD_TABLE_ALIGNMENT.CENTER
             table.autofit = False
@@ -629,17 +667,17 @@ class DocumentGenerator:
             _table_borders(table, BORDER_COLOR)
             ncols = len(table.columns)
             if ncols == 2:
-                widths = (Inches(2.2), Inches(4.3))
+                widths = (int(usable * 0.34), int(usable * 0.66))
             elif ncols == 3:
-                widths = (Inches(3.5), Inches(1.5), Inches(1.5))
+                widths = (int(usable * 0.50), int(usable * 0.25), int(usable * 0.25))
             else:
                 widths = None
+            if widths:
+                _set_fixed_widths(table, widths)
             for r_idx, row in enumerate(table.rows):
                 cells = row.cells
-                for idx, cell in enumerate(cells):
+                for cell in cells:
                     cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-                    if widths and idx < len(widths):
-                        cell.width = widths[idx]
 
                 if ncols == 2:
                     # Bold + shade the label column; zebra-stripe value cells.
@@ -901,6 +939,9 @@ class DocumentGenerator:
 
         rows = []
         for key, value in pm.items():
+            # Internal sales-prep brief — skip our own company self-description.
+            if key == 'company_details':
+                continue
             if not self._is_meaningful(value):
                 continue
             pretty = self._stringify(value)
@@ -940,7 +981,8 @@ class DocumentGenerator:
             notes.append(f"• Communication preference: {project_mgmt['communication_preferences']}")
         notes.extend(f"• {doc}" for doc in self._lines(project_mgmt.get('documentation_needs')))
 
-        notes = [n for n in notes if n.lower().strip('• ') not in {'unknown', 'n/a', 'none'}]
+        notes = [self._scrub_company(n) for n in notes]
+        notes = [n for n in notes if n.strip() and n.lower().strip('• ') not in {'unknown', 'n/a', 'none'}]
         if not notes:
             notes = ['• No special notes recorded.']
 
@@ -1071,7 +1113,39 @@ class DocumentGenerator:
     # ------------------------------------------------------------------
     # Helper to stringify complex values for tables
     # ------------------------------------------------------------------
+    def _scrub_company(self, text):
+        """Strip references to our own company. This is an INTERNAL brief for the
+        Chapter rep attending the walkthrough — not a client proposal — so
+        'Chapter will…' / 'Contractor (Chapter) handles…' self-description is noise."""
+        if not text:
+            return text
+        s = str(text)
+        for token in ('(Chapter)', '(chapter)', 'Chapter Renovations', 'Chapter'):
+            s = s.replace(token, '')
+        while '  ' in s:
+            s = s.replace('  ', ' ')
+        return s.strip().strip(';,').strip()
+
+    def _format_range(self, d):
+        """Format a {min,max}/{low,high} numeric dict as a currency range, else None."""
+        if not isinstance(d, dict) or not d:
+            return None
+        keys = {str(k).lower() for k in d.keys()}
+        if not keys <= {'min', 'max', 'low', 'high'}:
+            return None
+        lo = _to_number(d.get('min', d.get('low')))
+        hi = _to_number(d.get('max', d.get('high')))
+        if lo is None and hi is None:
+            return None
+        if lo is not None and hi is not None:
+            return self._format_currency(lo) if lo == hi else f"{self._format_currency(lo)} – {self._format_currency(hi)}"
+        return f"From {self._format_currency(lo)}" if lo is not None else f"Up to {self._format_currency(hi)}"
+
     def _stringify(self, value):
+        """Human-readable string for a value, with our own company name scrubbed."""
+        return self._scrub_company(self._stringify_raw(value))
+
+    def _stringify_raw(self, value):
         """Convert list/dict to a human-readable string, dropping empty/zero parts."""
         if isinstance(value, (list, tuple)):
             return ', '.join(str(v) for v in value if self._is_meaningful(v))
@@ -1082,6 +1156,10 @@ class DocumentGenerator:
                     continue
                 label = str(k).replace('_', ' ').title()
                 if isinstance(v, dict):
+                    rng = self._format_range(v)
+                    if rng is not None:
+                        parts.append(f"{label}: {rng}")
+                        continue
                     sub = ', '.join(
                         f"{str(sk).replace('_', ' ')}: {sv}"
                         for sk, sv in v.items() if self._is_meaningful(sv)

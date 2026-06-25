@@ -216,14 +216,7 @@ Return ONLY valid JSON matching this exact structure (fill in only the sections 
         "permit_requirements": string[],  // Permit requirements mentioned
         "contractor_requirements": string[],  // What they want from contractor
         "communication_preferences": string,  // How they prefer to communicate
-        "decision_process": string,  // How they make decisions
-        "company_details": {
-            "company_name": string,  // Contractor company name
-            "contact_person": string,  // Main contact person
-            "services_offered": string[],  // Services the company offers
-            "fees_structure": string[],  // Fee structure mentioned
-            "process_description": string  // How their process works
-        }
+        "decision_process": string  // How they make decisions
     }
 }
 
@@ -232,7 +225,7 @@ CRITICAL EXTRACTION RULES:
 2. TIMELINE DETAILS: Extract specific dates, durations, scheduling constraints, and any time-sensitive factors
 3. PROJECT SCOPE: Be very specific about what work is requested - rooms, systems, structural changes, etc.
 4. CLIENT CONSTRAINTS: Note any personal constraints (family situations, work schedules, living arrangements, health issues, etc.)
-5. COMPANY INFO: Extract contractor/company details, process descriptions, fee structures, services offered
+5. NO COMPANY SELF-DESCRIPTION: This brief is for our own salesperson attending the walkthrough. Do NOT describe our company, our services, our process, our fees, or our warranty/insurance, and never write "we will…" or "<company> will provide/handles…". Capture only the CLIENT's expectations of the contractor. Do not name our own company in any field.
 6. EXACT QUOTES: For requirements and preferences, use exact client language when possible
 7. NUMBERS: Convert written numbers to digits (e.g., "two hundred fifty thousand" = 250000, "five percent" = 5)
 8. ADDRESSES: Extract complete address exactly as stated, correct obvious spelling errors
@@ -244,12 +237,18 @@ CRITICAL EXTRACTION RULES:
 Process this transcript and return ONLY the JSON:"""
 
             system_prompt = (
-                "You are an expert renovation consultant assistant that extracts comprehensive, "
-                "detailed information from any type of renovation or construction consultation "
-                "transcript. You work with all project types: kitchen renovations, bathroom remodels, "
-                "additions, whole-house renovations, commercial projects, etc. You pay close attention "
-                "to budget numbers, timelines, specific requirements, and client constraints regardless "
-                "of project scope. Respond with ONLY the JSON object — no markdown fences, no prose."
+                "You prepare an INTERNAL pre-walkthrough briefing for the renovation company's OWN "
+                "salesperson, who will attend the on-site walkthrough. From the consultation transcript "
+                "you extract comprehensive, detailed information about the CLIENT and their PROJECT across "
+                "all project types (kitchen, bath, additions, whole-house, commercial, etc.): scope, budget "
+                "numbers, timeline, specific requirements, materials/style, decision-making style, and "
+                "personal constraints. Pay close attention to budget numbers, timelines, specific "
+                "requirements, and client constraints regardless of project scope. "
+                "IMPORTANT: This brief is for our own rep, so do NOT describe our company, our services, "
+                "our process, our fees, or our warranty/insurance, and never write 'we will…' or "
+                "'<company> will provide/handles…' statements about ourselves; do not name our own company "
+                "in any field. Capture only the client's needs and their expectations of the contractor. "
+                "Respond with ONLY the JSON object — no markdown fences, no prose."
             )
 
             logger.info("Extracting renovation information via %s", self.model)
