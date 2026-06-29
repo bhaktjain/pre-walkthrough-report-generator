@@ -95,36 +95,6 @@ def _table_borders(table, color_hex: str, sz: str = '4') -> None:
     tblPr.append(borders)
 
 
-def _set_fixed_widths(table, widths) -> None:
-    """Pin column widths so EVERY renderer honors them — including mobile viewers.
-
-    python-docx's ``cell.width`` only writes per-cell ``<w:tcW>``; it leaves the
-    ``<w:tblGrid>`` at its creation-time (equal) split. Under ``tblLayout=fixed``
-    many renderers — notably lightweight mobile / Quick Look viewers — size
-    columns from the grid, so without updating it they auto-fit columns to
-    content and overflow the page (the right-edge cut-off seen on phones). We
-    therefore set the grid (via column widths), each cell's tcW, and an explicit
-    total table width. ``widths`` are EMU Lengths.
-    """
-    for i, w in enumerate(widths):
-        try:
-            table.columns[i].width = w   # updates <w:gridCol> (authoritative under fixed layout)
-        except Exception:
-            pass
-    for row in table.rows:
-        for i, w in enumerate(widths):
-            if i < len(row.cells):
-                row.cells[i].width = w   # updates <w:tcW>
-    total_dxa = sum(int(int(w) / 635) for w in widths)  # 635 EMU per twip (dxa)
-    tblPr = table._tbl.tblPr
-    tblW = tblPr.find(qn('w:tblW'))
-    if tblW is None:
-        tblW = OxmlElement('w:tblW')
-        tblPr.append(tblW)
-    tblW.set(qn('w:w'), str(total_dxa))
-    tblW.set(qn('w:type'), 'dxa')
-
-
 class DocumentGenerator:
     def __init__(self):
         self.doc = Document()
@@ -650,30 +620,20 @@ class DocumentGenerator:
         self.doc.add_paragraph()
 
     def _finalize_tables(self):
-        """Normalize every table for a clean, aligned, symmetric layout.
+        """Style every table for a clean, branded look that renders reliably.
 
-        Column widths are sized to the page's ACTUAL usable width (page width
-        minus left/right margins) and pinned into the table grid + every cell so
-        all renderers — including mobile viewers — honor them instead of
-        overflowing the page. Tables are centered, cells vertically centered, and
-        two-column key/value tables get bold, shaded labels.
+        Tables are LEFT-anchored at the margin and left to AUTOFIT the page,
+        rather than pinned to fixed column widths. Lightweight mobile previews
+        (iOS / SharePoint quick-view) render auto-fitted tables correctly but
+        mis-place fixed-width tables, pushing them off the page. Earlier reports
+        used autofit and previewed correctly, so we keep that and only layer on
+        color + borders (which have no layout effect).
         """
-        section = self.doc.sections[0]
-        usable = section.page_width - section.left_margin - section.right_margin
         for table in self.doc.tables:
-            table.alignment = WD_TABLE_ALIGNMENT.CENTER
-            table.autofit = False
-            table.allow_autofit = False
+            table.alignment = WD_TABLE_ALIGNMENT.LEFT
+            table.autofit = True
             _table_borders(table, BORDER_COLOR)
             ncols = len(table.columns)
-            if ncols == 2:
-                widths = (int(usable * 0.34), int(usable * 0.66))
-            elif ncols == 3:
-                widths = (int(usable * 0.50), int(usable * 0.25), int(usable * 0.25))
-            else:
-                widths = None
-            if widths:
-                _set_fixed_widths(table, widths)
             for r_idx, row in enumerate(table.rows):
                 cells = row.cells
                 for cell in cells:
