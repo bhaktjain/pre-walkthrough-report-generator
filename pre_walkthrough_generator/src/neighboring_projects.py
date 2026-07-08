@@ -46,7 +46,7 @@ class NeighboringProjectsManager:
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.cache_file = self.cache_dir / "zoho_deals_cache.json"
-        self.cache_ttl_hours = 168  # Refresh every 1 week (7 days * 24 hours)
+        self.cache_ttl_hours = 48  # Consider the cache stale after 2 days (auto-refreshed on a timer)
 
     def _normalize_address(self, address: str) -> str:
         """Normalize address for comparison"""

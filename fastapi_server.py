@@ -9,6 +9,7 @@ import hmac
 from pathlib import Path
 from typing import Optional
 import logging
+import asyncio
 import json
 import re
 from config_manager import config_manager
@@ -91,45 +92,74 @@ def _redact_config(cfg) -> dict:
         redacted["api_keys"] = {k: _mask(v) for k, v in api_keys.items()}
     return redacted
 
+# Keep the Zoho deals cache current without a redeploy. The service stays up
+# for days, so a startup-only sync isn't enough — we also refresh on a timer.
+ZOHO_REFRESH_INTERVAL_HOURS = 48
+
+
+def _sync_zoho_cache(force: bool = False) -> bool:
+    """Refresh the Zoho deals cache from CRM. Returns True if it refreshed.
+
+    Blocking (network + geocoding) — call via ``asyncio.to_thread`` from async
+    code. Existing neighborhood tags are carried forward (matched by Deal_Name),
+    so only newly added deals are geocoded and the refresh stays fast.
+    """
+    manager = NeighboringProjectsManager()
+    stats = manager.get_cache_stats()
+    if not force and stats.get('valid') and stats.get('count', 0) > 0:
+        logger.info(f"Zoho cache is valid ({stats['count']} deals, {stats.get('age_hours', 0):.1f}h old). Skipping sync.")
+        return False
+
+    # Credentials come from the environment first, then config.json (via Config).
+    cfg = config.Config()
+    zoho_client_id = os.environ.get("ZOHO_CLIENT_ID") or cfg.zoho_client_id
+    zoho_client_secret = os.environ.get("ZOHO_CLIENT_SECRET") or cfg.zoho_client_secret
+    zoho_refresh_token = os.environ.get("ZOHO_REFRESH_TOKEN") or cfg.zoho_refresh_token
+    if not all([zoho_client_id, zoho_client_secret, zoho_refresh_token]):
+        logger.warning("Zoho credentials not configured. Neighboring projects will use existing cache if available.")
+        return False
+
+    logger.info("Syncing Zoho deals%s...", " (forced)" if force else "")
+    from zoho_api import ZohoAPI
+    from nyc_neighborhoods import enrich_deals_with_neighborhoods
+    zoho = ZohoAPI(zoho_client_id, zoho_client_secret, zoho_refresh_token)
+    fields = ["Deal_Name", "Amount", "Stage", "Contact_Name", "Closing_Date"]
+    deals = zoho.get_all_records("Deals", fields=fields, max_records=5000)
+    if not deals:
+        logger.warning("No deals returned from Zoho API")
+        return False
+
+    # Carry forward existing tags (modifies `deals` in place), then geocode only
+    # the deals still untagged — i.e. the newly added ones.
+    manager.save_cache(deals, preserve_neighborhoods=True)
+    new_deals = [d for d in deals if not d.get("Neighborhood")]
+    if new_deals:
+        enrich_deals_with_neighborhoods(new_deals, use_geocoding=True)
+        manager.save_cache(deals, preserve_neighborhoods=True)
+    tagged = sum(1 for d in deals if d.get("Neighborhood"))
+    logger.info(f"Zoho cache refreshed: {len(deals)} deals ({tagged} tagged, {len(new_deals)} newly geocoded)")
+    return True
+
+
+async def _periodic_zoho_refresh():
+    """Force a Zoho cache refresh every ZOHO_REFRESH_INTERVAL_HOURS."""
+    while True:
+        await asyncio.sleep(ZOHO_REFRESH_INTERVAL_HOURS * 3600)
+        try:
+            await asyncio.to_thread(_sync_zoho_cache, True)
+        except Exception as e:
+            logger.error(f"Periodic Zoho refresh failed (non-fatal): {e}")
+
+
 @app.on_event("startup")
 async def startup_sync_zoho_cache():
-    """On startup, try to refresh Zoho deals cache if stale and credentials are available."""
+    """Refresh the Zoho cache if stale on startup, then keep it fresh on a timer."""
     try:
-        manager = NeighboringProjectsManager()
-        stats = manager.get_cache_stats()
-        logger.info(f"Zoho cache stats on startup: {stats}")
-        
-        if stats.get('valid') and stats.get('count', 0) > 0:
-            logger.info(f"Zoho cache is valid ({stats['count']} deals, {stats.get('age_hours', 0):.1f}h old). Skipping sync.")
-            return
-        
-        # Cache is missing or stale — try to sync. Credentials come from the
-        # environment first, then config.json (via Config).
-        cfg = config.Config()
-        zoho_client_id = os.environ.get("ZOHO_CLIENT_ID") or cfg.zoho_client_id
-        zoho_client_secret = os.environ.get("ZOHO_CLIENT_SECRET") or cfg.zoho_client_secret
-        zoho_refresh_token = os.environ.get("ZOHO_REFRESH_TOKEN") or cfg.zoho_refresh_token
-
-        if not all([zoho_client_id, zoho_client_secret, zoho_refresh_token]):
-            logger.warning("Zoho credentials not configured. Neighboring projects will use existing cache if available.")
-            return
-
-        logger.info("Zoho cache is stale or missing. Syncing deals...")
-        from zoho_api import ZohoAPI
-        from nyc_neighborhoods import enrich_deals_with_neighborhoods
-        zoho = ZohoAPI(zoho_client_id, zoho_client_secret, zoho_refresh_token)
-        fields = ["Deal_Name", "Amount", "Stage", "Contact_Name", "Closing_Date"]
-        deals = zoho.get_all_records("Deals", fields=fields, max_records=5000)
-
-        if deals:
-            # Tag with neighborhoods before caching so report-time matching works.
-            enrich_deals_with_neighborhoods(deals, use_geocoding=True)
-            manager.save_cache(deals)
-            logger.info(f"Zoho cache refreshed: {len(deals)} deals")
-        else:
-            logger.warning("No deals returned from Zoho API")
+        await asyncio.to_thread(_sync_zoho_cache, False)
     except Exception as e:
         logger.error(f"Startup Zoho sync failed (non-fatal): {e}")
+    # Keep neighboring-project data current between deploys.
+    asyncio.create_task(_periodic_zoho_refresh())
 
 
 @app.get("/health")
