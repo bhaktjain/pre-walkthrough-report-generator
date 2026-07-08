@@ -1,10 +1,154 @@
 {
-  "timestamp": "2026-06-24T19:02:54.798310",
+  "timestamp": "2026-07-08T16:33:39.132778",
   "deals": [
+    {
+      "Deal_Name": "33 Riverside Dr #9C",
+      "Amount": 305000,
+      "Stage": "HOT",
+      "id": "4981506000109480002",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Brett Tanzer",
+        "id": "4981506000108757042"
+      },
+      "Neighborhood": "Upper West Side"
+    },
+    {
+      "Deal_Name": "40 Roseholm Place",
+      "Amount": 160500,
+      "Stage": "COLD",
+      "id": "4981506000109436012",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Lynn Gonzalez",
+        "id": "4981506000108326007"
+      },
+      "Neighborhood": "Mount Kisco"
+    },
+    {
+      "Deal_Name": "762 Brady Avenue #526",
+      "Amount": 159500,
+      "Stage": "COLD",
+      "id": "4981506000109310022",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Gregory Cooper-Spencer",
+        "id": "4981506000107373055"
+      },
+      "Neighborhood": "Parkchester"
+    },
+    {
+      "Deal_Name": "23-64 35th Street",
+      "Amount": 275600,
+      "Stage": "WARM",
+      "id": "4981506000109300023",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "June Wang",
+        "id": "4981506000107705161"
+      },
+      "Neighborhood": "Astoria"
+    },
+    {
+      "Deal_Name": "25 Peach Tree Court",
+      "Amount": 245705,
+      "Stage": "Proposal sent",
+      "id": "4981506000109077008",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Astad Clubwala",
+        "id": "4981506000108291034"
+      },
+      "Neighborhood": "Marlboro Township"
+    },
+    {
+      "Deal_Name": "9 Northfield Avenue",
+      "Amount": 380395,
+      "Stage": "COLD",
+      "id": "4981506000108782009",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Shyam Pandya",
+        "id": "4981506000107237386"
+      },
+      "Neighborhood": "Dobbs Ferry"
+    },
+    {
+      "Deal_Name": "239 West 148th Street #3B",
+      "Amount": 175500,
+      "Stage": "HOT",
+      "id": "4981506000108762015",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Anna Resnikoff",
+        "id": "4981506000107900509"
+      },
+      "Neighborhood": "Hamilton Heights"
+    },
+    {
+      "Deal_Name": "1616 Harrison Avenue",
+      "Amount": 86020,
+      "Stage": "WARM",
+      "id": "4981506000108751010",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Scott Wright",
+        "id": "4981506000106876009"
+      },
+      "Neighborhood": "Tribeca"
+    },
+    {
+      "Deal_Name": "339 Bedford Avenue #15",
+      "Amount": 155400,
+      "Stage": "COLD",
+      "id": "4981506000108647008",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "Samantha Spiesman",
+        "id": "4981506000108023072"
+      },
+      "Neighborhood": "Williamsburg"
+    },
+    {
+      "Deal_Name": "393 West 49th Street #4OO",
+      "Amount": 145600,
+      "Stage": "Closed Lost",
+      "id": "4981506000108570015",
+      "Closing_Date": "2026-06-30",
+      "Contact_Name": {
+        "name": "Fiona Yang",
+        "id": "4981506000107929017"
+      },
+      "Neighborhood": "Midtown West"
+    },
+    {
+      "Deal_Name": "372 5th Avenue #10H",
+      "Amount": 125600,
+      "Stage": "COLD",
+      "id": "4981506000108569005",
+      "Closing_Date": null,
+      "Contact_Name": {
+        "name": "David Bell",
+        "id": "4981506000105637065"
+      },
+      "Neighborhood": "Midtown"
+    },
+    {
+      "Deal_Name": "2000 N Bayshore Drive",
+      "Amount": 171282.6,
+      "Stage": "Closed Lost",
+      "id": "4981506000108549002",
+      "Closing_Date": "2026-07-08",
+      "Contact_Name": {
+        "name": "Sindy Guerrero",
+        "id": "4981506000108049065"
+      },
+      "Neighborhood": "Wynwood"
+    },
     {
       "Deal_Name": "400 East 77th Street #1H",
       "Amount": 178500,
-      "Stage": "Proposal sent",
+      "Stage": "WARM",
       "id": "4981506000108333002",
       "Closing_Date": null,
       "Contact_Name": {
@@ -27,8 +171,8 @@
     },
     {
       "Deal_Name": "10 West 15th Street #316",
-      "Amount": 185600,
-      "Stage": "WARM",
+      "Amount": 165135,
+      "Stage": "HOT",
       "id": "4981506000108243025",
       "Closing_Date": null,
       "Contact_Name": {
@@ -76,7 +220,7 @@
     {
       "Deal_Name": "209 Washington Street #3",
       "Amount": 78780,
-      "Stage": "Proposal sent",
+      "Stage": "COLD",
       "id": "4981506000107877013",
       "Closing_Date": null,
       "Contact_Name": {
@@ -136,9 +280,9 @@
     {
       "Deal_Name": "28 West 128th Street",
       "Amount": 960000,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000107180002",
-      "Closing_Date": null,
+      "Closing_Date": "2026-07-03",
       "Contact_Name": {
         "name": "Mike Cummings",
         "id": "4981506000105854030"
@@ -172,7 +316,7 @@
     {
       "Deal_Name": "1247 Anastasia Ave",
       "Amount": 687070,
-      "Stage": "COLD",
+      "Stage": "WARM",
       "id": "4981506000106766003",
       "Closing_Date": null,
       "Contact_Name": {
@@ -220,7 +364,7 @@
     {
       "Deal_Name": "335 Greenwich Street #2/3C",
       "Amount": 135600,
-      "Stage": "WARM",
+      "Stage": "COLD",
       "id": "4981506000106602005",
       "Closing_Date": null,
       "Contact_Name": {
@@ -304,7 +448,7 @@
     {
       "Deal_Name": "68-10 Ingram Street",
       "Amount": 855600,
-      "Stage": "WARM",
+      "Stage": "COLD",
       "id": "4981506000106172012",
       "Closing_Date": null,
       "Contact_Name": {
@@ -315,10 +459,10 @@
     },
     {
       "Deal_Name": "50 East 89th Street #19B",
-      "Amount": 178500,
-      "Stage": "WARM",
+      "Amount": 121500,
+      "Stage": "Closed Lost",
       "id": "4981506000106101008",
-      "Closing_Date": null,
+      "Closing_Date": "2026-07-06",
       "Contact_Name": {
         "name": "Daniel Androuin",
         "id": "4981506000105504019"
@@ -568,9 +712,9 @@
     {
       "Deal_Name": "300 East 59th Street #2906",
       "Amount": 212500,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000104755003",
-      "Closing_Date": null,
+      "Closing_Date": "2026-06-26",
       "Contact_Name": {
         "name": "Ashish Chabria",
         "id": "4981506000103783425"
@@ -892,9 +1036,9 @@
     {
       "Deal_Name": "971 Northeast 115th Street",
       "Amount": 231237.3,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000103033020",
-      "Closing_Date": null,
+      "Closing_Date": "2026-07-08",
       "Contact_Name": {
         "name": "Grant Burger",
         "id": "4981506000099238539"
@@ -1528,9 +1672,9 @@
     {
       "Deal_Name": "411 West End Ave #9D",
       "Amount": 159000,
-      "Stage": "COLD",
+      "Stage": "Closed Lost",
       "id": "4981506000097915015",
-      "Closing_Date": null,
+      "Closing_Date": "2026-07-06",
       "Contact_Name": {
         "name": "Ellen Shoshkes",
         "id": "4981506000095370028"
@@ -2044,7 +2188,7 @@
     {
       "Deal_Name": "635 Jersey Avenue",
       "Amount": 291090,
-      "Stage": "WARM",
+      "Stage": "COLD",
       "id": "4981506000093304033",
       "Closing_Date": null,
       "Contact_Name": {
@@ -2092,7 +2236,7 @@
     {
       "Deal_Name": "100-11 67th Road #416",
       "Amount": 114005,
-      "Stage": "WARM",
+      "Stage": "Closed Lost",
       "id": "4981506000093055014",
       "Closing_Date": null,
       "Contact_Name": {
@@ -12530,5 +12674,5 @@
       "Neighborhood": "Harlem"
     }
   ],
-  "count": 1045
+  "count": 1057
 }
