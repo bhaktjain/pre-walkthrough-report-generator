@@ -1,8 +1,11 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Header, Depends
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 import uvicorn
 import tempfile
 import os
+import uuid
+import time
+import threading
 import sys
 import copy
 import hmac
@@ -207,7 +210,7 @@ def clean_address(address: str) -> str:
         address = re.sub(pat, repl, address, flags=re.IGNORECASE)
     return address
 
-def process_transcript_and_generate_report(transcript_path: str, address: str = None, last_name: str = None) -> str:
+def process_transcript_and_generate_report(transcript_path: str, address: str = None, last_name: str = None, output_name: str = None) -> str:
     """
     Process a transcript and generate a pre-walkthrough report.
     
@@ -224,7 +227,6 @@ def process_transcript_and_generate_report(transcript_path: str, address: str = 
         config_obj = config.Config()
         doc_generator = document_generator.DocumentGenerator()
         transcript_processor_obj = transcript_processor.TranscriptProcessor(config_obj.anthropic_api_key, config_obj.claude_model)
-        property_api_obj = property_api.PropertyAPI(config_obj.rapidapi_key, config_obj.serpapi_key)
 
         # Read and clean transcript
         with open(transcript_path, 'r') as f:
@@ -294,67 +296,73 @@ def process_transcript_and_generate_report(transcript_path: str, address: str = 
 
         logger.info(f"Using address: {address}")
 
-        # Use the optimized method to get all property data in one go
-        logger.info("Fetching all property data...")
-        property_data = property_api_obj.get_all_property_data(address)
-        
-        # Extract the components
-        property_id = property_data.get("property_id", "N/A")
-        property_details = property_data.get("property_details", {})
-        property_photos = property_data.get("images", {"images": []})
-        floor_plans = property_data.get("floor_plans", {"floor_plans": []})
-        canonical_realtor_url = property_data.get("realtor_url")
-        
-        logger.info(f"Property ID: {property_id}")
-        logger.info(f"Realtor URL: {canonical_realtor_url}")
-        
-        # Check if property details are missing (validation failed)
-        if not property_details or not property_details.get('address'):
-            logger.warning("⚠️  Property details are missing or validation failed!")
-            logger.warning(f"⚠️  Requested address: {address}")
-            logger.warning("⚠️  This could mean:")
-            logger.warning("   1. Property not found on Realtor.com")
-            logger.warning("   2. Property ID lookup returned wrong property (validation rejected it)")
-            logger.warning("   3. Property is off-market or recently delisted")
-            logger.warning("⚠️  Report will be generated with limited property information")
-        
-        # Fetch neighboring projects from Zoho CRM cache
+        # --- Property + owner research via Claude web search (PRIMARY source) ---
+        # Realtor/SerpAPI only cover ON-market listings, so owned homes (the
+        # typical walkthrough client) come back empty. Public-records web research
+        # fills the report instead. This is the slow step (minutes) — the async
+        # endpoints exist so callers don't hit an HTTP timeout waiting for it.
+        import property_research
+        owner_name = None
+        names = (transcript_info.get('client_info') or {}).get('names') or []
+        if names:
+            owner_name = str(names[0]).split('(')[0].strip() or None
+
+        logger.info("Researching property + owner via web search for '%s' (may take a few minutes)...", address)
+        research = property_research.research_property(
+            address, config_obj.anthropic_api_key, owner_name=owner_name
+        ) or {}
+        property_details = research.get("property_details") or {}
+        if not property_details:
+            logger.warning("Property research returned nothing for '%s' — limited property info", address)
+        else:
+            logger.info("Property research complete (found=%s)", research.get("found"))
+
+        # --- Neighboring projects from the Zoho cache ---
         logger.info("Looking up neighboring projects...")
         neighboring_projects = []
         try:
             projects_manager = NeighboringProjectsManager()
-            
-            # Extract neighborhood from property details if available
-            neighborhood = None
-            if property_details and isinstance(property_details, dict):
-                neighborhood = property_details.get('neighborhood', None)
-                if neighborhood == 'Information not available':
-                    neighborhood = None
-            
-            # Always try to find neighboring projects using address-based neighborhood lookup
-            logger.info(f"Searching for neighboring projects (neighborhood from API: {neighborhood})")
+            neighborhood = property_details.get('neighborhood') if isinstance(property_details, dict) else None
+            if neighborhood == 'Information not available':
+                neighborhood = None
             neighboring_projects = projects_manager.find_neighboring_projects(
                 target_address=address,
                 target_neighborhood=neighborhood,
-                same_building_only=False
+                same_building_only=False,
             )
             logger.info(f"Found {len(neighboring_projects)} neighboring projects")
         except Exception as e:
             logger.error(f"Error fetching neighboring projects: {e}")
-            import traceback
-            traceback.print_exc()
-            # Continue without neighboring projects
 
-        # Create final data dictionary
+        # --- Matching deal's CRM notes (best-effort) ---
+        zoho_notes = []
+        try:
+            zc = (os.environ.get("ZOHO_CLIENT_ID") or config_obj.zoho_client_id,
+                  os.environ.get("ZOHO_CLIENT_SECRET") or config_obj.zoho_client_secret,
+                  os.environ.get("ZOHO_REFRESH_TOKEN") or config_obj.zoho_refresh_token)
+            if all(zc):
+                from zoho_api import ZohoAPI
+                zoho_notes = ZohoAPI(*zc).get_relevant_notes(address=address, contact_name=owner_name)
+        except Exception as e:
+            logger.error(f"Error fetching CRM notes: {e}")
+
+        # --- Assemble report data ---
         final_data = {
             "property_address": address,
-            "property_id": property_id,
-            "realtor_url": canonical_realtor_url,
+            "property_id": research.get("property_id"),
+            "realtor_url": None,
+            "zillow_url": None,
             "property_details": property_details,
-            "images": property_photos,
-            "floor_plans": floor_plans,
+            "images": {"images": []},
+            "floor_plans": {"floor_plans": []},
             "transcript_info": transcript_info,
-            "neighboring_projects": neighboring_projects
+            "neighboring_projects": neighboring_projects,
+            "research_zoning": research.get("zoning"),
+            "research_flood": research.get("flood_zone"),
+            "research_feasibility": research.get("feasibility") or [],
+            "research_sources": research.get("sources") or [],
+            "owner_summary": research.get("owner_summary"),
+            "zoho_notes": zoho_notes,
         }
 
         # Generate report
@@ -376,7 +384,11 @@ def process_transcript_and_generate_report(transcript_path: str, address: str = 
         safe_addr = sanitize_filename(address.split(',')[0]) if address else Path(transcript_path).stem
         safe_addr = safe_addr.replace(' ', '_')
         
-        if last_name:
+        if output_name:
+            # Async jobs pass a unique name so concurrent/repeated reports never
+            # collide on the same data/ file (which could serve one client another's report).
+            file_name = f"{sanitize_filename(output_name)}.docx"
+        elif last_name:
             safe_last_name = sanitize_filename(last_name)
             file_name = f"PreWalk_{safe_last_name}.docx"
         else:
@@ -563,6 +575,124 @@ async def generate_report_from_text(request: TranscriptRequest):
         if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
             os.unlink(temp_file_path)
         raise HTTPException(status_code=500, detail=f"Error generating report: {str(e)}")
+
+# --- Async report generation -------------------------------------------------
+# Deep property research runs for several minutes, longer than a sync HTTP step
+# will wait. These endpoints implement the standard 202 + Location poll pattern:
+# POST returns 202 immediately with a Location; poll that Location until it
+# returns the .docx. In Power Automate, turn ON the HTTP action's "Asynchronous
+# pattern" and it handles the polling automatically. Single gunicorn worker, so
+# the in-memory job store is shared across the POST and the poll requests.
+_report_jobs: dict = {}
+_REPORT_JOB_TTL = 3600   # seconds a finished job (and its .docx) is retained
+_REPORT_JOB_MAX = 200    # hard cap on retained jobs
+
+
+def _prune_report_jobs() -> None:
+    """Evict finished jobs (deleting their .docx) past the TTL or beyond the cap,
+    so the long-lived single worker doesn't leak memory and disk."""
+    try:
+        now = time.time()
+        finished = [(jid, j) for jid, j in _report_jobs.items() if j.get("status") in ("done", "error")]
+        stale = {jid for jid, j in finished if now - j.get("ts", now) > _REPORT_JOB_TTL}
+        remaining = [(jid, j) for jid, j in finished if jid not in stale]
+        overflow = len(_report_jobs) - len(stale) - _REPORT_JOB_MAX
+        if overflow > 0:
+            for jid, _ in sorted(remaining, key=lambda kv: kv[1].get("ts", 0))[:overflow]:
+                stale.add(jid)
+        for jid in stale:
+            j = _report_jobs.pop(jid, None)
+            path = (j or {}).get("path")
+            if path and os.path.exists(path):
+                try:
+                    os.unlink(path)
+                except Exception:
+                    pass
+    except Exception as e:
+        logger.warning("Report-job prune failed: %s", e)
+
+
+def _run_report_job(job_id: str, flattened: str, address: Optional[str], last_name: Optional[str]) -> None:
+    temp_file_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".txt", mode="w") as temp_file:
+            temp_file.write(flattened)
+            temp_file_path = temp_file.name
+        report_path = process_transcript_and_generate_report(
+            transcript_path=temp_file_path, address=address, last_name=last_name,
+            output_name=f"PreWalk_{job_id}",  # unique on-disk name per job
+        )
+        if temp_file_path and os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
+        if not report_path or not os.path.exists(report_path):
+            _report_jobs[job_id] = {"status": "error", "error": "Failed to generate report", "ts": time.time()}
+        else:
+            _report_jobs[job_id] = {"status": "done", "path": report_path, "last_name": last_name, "ts": time.time()}
+            logger.info("Async report job %s complete: %s", job_id, report_path)
+    except Exception as e:
+        if temp_file_path and os.path.exists(temp_file_path):
+            try:
+                os.unlink(temp_file_path)
+            except Exception:
+                pass
+        logger.error("Async report job %s failed: %s", job_id, e)
+        _report_jobs[job_id] = {"status": "error", "error": str(e), "ts": time.time()}
+
+
+@app.post("/generate-report-from-text-async")
+async def generate_report_from_text_async(request: TranscriptRequest):
+    """Start report generation (incl. multi-minute web research) and return 202 + Location.
+
+    Poll the Location URL until it returns the .docx (200). Enable Power
+    Automate's "Asynchronous pattern" on the HTTP action to poll automatically.
+    """
+    if not request.transcript_text or not request.transcript_text.strip():
+        raise HTTPException(status_code=400, detail="Transcript text is required and cannot be empty")
+    flattened = flatten_jsonl_transcript(request.transcript_text)
+    if not flattened or not flattened.strip():
+        raise HTTPException(status_code=400, detail="Transcript text appears to be empty or invalid")
+    meaningful_content = re.sub(r'[{}":\s\n\r]', '', flattened)
+    if len(meaningful_content) < 50:
+        raise HTTPException(status_code=400, detail="Transcript text appears to have insufficient content for report generation")
+
+    _prune_report_jobs()
+    job_id = uuid.uuid4().hex
+    _report_jobs[job_id] = {"status": "running"}
+    threading.Thread(
+        target=_run_report_job,
+        args=(job_id, flattened, request.address, request.last_name),
+        daemon=True,
+    ).start()
+    logger.info("Started async report job %s (address=%r)", job_id, request.address)
+    return JSONResponse(
+        status_code=202,
+        content={"job_id": job_id, "status": "running"},
+        headers={"Location": f"/report-status/{job_id}", "Retry-After": "20"},
+    )
+
+
+@app.get("/report-status/{job_id}")
+async def report_status(job_id: str):
+    """Poll target for an async report: 202 while running, 200 with the .docx when done."""
+    job = _report_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Unknown or expired job id")
+    if job["status"] == "running":
+        return JSONResponse(
+            status_code=202,
+            content={"status": "running"},
+            headers={"Location": f"/report-status/{job_id}", "Retry-After": "20"},
+        )
+    if job["status"] == "error":
+        raise HTTPException(status_code=500, detail=job.get("error", "Report generation failed"))
+    if not job.get("path") or not os.path.exists(job["path"]):
+        raise HTTPException(status_code=410, detail="Report file is no longer available")
+    return FileResponse(
+        path=job["path"],
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        filename=f"PreWalkReport_{job.get('last_name') or 'Report'}.docx",
+    )
+
 
 @app.get("/config")
 async def get_config(_: bool = Depends(require_admin)):

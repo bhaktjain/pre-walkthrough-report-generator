@@ -6,6 +6,8 @@ Handles authentication and data fetching from Zoho CRM
 import requests
 import json
 import time
+import re
+import html
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 import logging
@@ -42,7 +44,10 @@ class ZohoAPI:
         }
         
         try:
-            response = requests.post(self.auth_url, params=params, timeout=10)
+            # Send credentials in the POST BODY (data=), never the query string —
+            # otherwise client_secret/refresh_token land in the request URL and a
+            # raised HTTPError (which echoes the URL) leaks them into the logs.
+            response = requests.post(self.auth_url, data=params, timeout=10)
             response.raise_for_status()
             data = response.json()
             
@@ -61,7 +66,8 @@ class ZohoAPI:
             return self.access_token
             
         except Exception as e:
-            logger.error(f"Error refreshing Zoho token: {e}")
+            # Log only the exception TYPE — the message can carry the auth URL/creds.
+            logger.error("Error refreshing Zoho token: %s", type(e).__name__)
             raise
     
     def _make_request(self, endpoint: str, params: Dict = None) -> Dict[str, Any]:
@@ -78,6 +84,10 @@ class ZohoAPI:
         try:
             response = requests.get(url, headers=headers, params=params, timeout=15)
             response.raise_for_status()
+            # Zoho returns 204 No Content (empty body) when a search/related-list
+            # has no records — that's a normal "not found", not an error.
+            if response.status_code == 204 or not response.content:
+                return {}
             return response.json()
         except Exception as e:
             logger.error(f"Error making Zoho API request to {endpoint}: {e}")
@@ -185,3 +195,98 @@ class ZohoAPI:
         safe = str(neighborhood).replace('(', ' ').replace(')', ' ').replace(':', ' ').strip()
         criteria = f"(Neighborhood:equals:{safe})"
         return self.search_records(module_name, criteria)
+
+    @staticmethod
+    def _coql_safe(value: str) -> str:
+        """Strip characters that would break a COQL criteria value."""
+        v = str(value or "")
+        for ch in ('(', ')', ':', '#', '\\', '"', ','):
+            v = v.replace(ch, ' ')
+        return ' '.join(v.split())
+
+    @staticmethod
+    def _strip_html(text: str, max_len: int = 2000) -> str:
+        """Zoho notes are stored as HTML — convert to clean plain text for the report."""
+        s = str(text or "")
+        s = re.sub(r'(?i)<\s*(br|/p|/li|/div|/tr|/h[1-6])\s*/?>', '\n', s)
+        s = re.sub(r'<[^>]+>', '', s)
+        s = html.unescape(s)
+        s = re.sub(r'[ \t]+', ' ', s)
+        s = re.sub(r'\n\s*\n+', '\n', s).strip()
+        if len(s) > max_len:
+            s = s[:max_len].rstrip() + '…'
+        return s
+
+    def _notes_for_record(self, module_name: str, record_id: str, seen: set, out: List[str]) -> None:
+        """Append a record's note contents (as 'Title: Content' strings) into ``out``, deduped."""
+        try:
+            data = self._make_request(f"{module_name}/{record_id}/Notes")
+            for n in (data.get("data", []) if isinstance(data, dict) else []):
+                title = self._strip_html(n.get("Note_Title") or "", max_len=200)
+                content = self._strip_html(n.get("Note_Content") or "")
+                txt = f"{title}: {content}" if title and content else (content or title)
+                txt = txt.strip()
+                if txt and txt not in seen:
+                    seen.add(txt)
+                    out.append(txt)
+        except Exception as e:
+            logger.warning("Could not fetch notes for %s/%s: %s", module_name, record_id, e)
+
+    def get_relevant_notes(self, address: str = None, contact_name: str = None,
+                           max_notes: int = 10) -> List[str]:
+        """Gather CRM notes relevant to this walkthrough.
+
+        Notes live on both Deals and Contacts. Primary (precise) path: match the
+        Deal by address, pull the Deal's notes AND its linked Contact's notes.
+        Fallback: if no deal matched and a client name is known, match the Contact
+        by exact first+last name. Returns deduped 'Title: Content' strings, or [].
+        Never raises.
+        """
+        out: List[str] = []
+        seen: set = set()
+        try:
+            # 1. Deal by address -> deal notes + linked-contact notes.
+            #    Only trust a UNIQUE match, or an EXACT street match among several;
+            #    if the address is ambiguous (matches multiple unrelated deals),
+            #    SKIP rather than guess deals[0] — guessing could surface a
+            #    different party's private CRM notes.
+            deal_matched = False
+            street = self._coql_safe(str(address or "").split(',')[0])
+            if len(street) >= 3:
+                deals = self.search_records("Deals", f"(Deal_Name:starts_with:{street})",
+                                            fields=["Deal_Name", "Contact_Name"])
+                chosen = None
+                if len(deals) == 1:
+                    chosen = deals[0]
+                elif len(deals) > 1:
+                    exact = [d for d in deals
+                             if self._coql_safe(str(d.get("Deal_Name", ""))).lower() == street.lower()]
+                    chosen = exact[0] if len(exact) == 1 else None
+                    if not chosen:
+                        logger.info("Ambiguous deal match for %r (%d candidates) — skipping deal notes",
+                                    address, len(deals))
+                if chosen:
+                    deal_matched = True
+                    if chosen.get("id"):
+                        self._notes_for_record("Deals", chosen["id"], seen, out)
+                    cn = chosen.get("Contact_Name")
+                    if isinstance(cn, dict) and cn.get("id"):
+                        self._notes_for_record("Contacts", cn["id"], seen, out)
+
+            # 2. Fallback: exact contact-name match (only if the deal path found nothing)
+            if not out and contact_name:
+                parts = self._coql_safe(contact_name).split()
+                if len(parts) >= 2:
+                    first, last = parts[0], parts[-1]
+                    contacts = self.search_records(
+                        "Contacts", f"((Last_Name:equals:{last})and(First_Name:equals:{first}))",
+                        fields=["Full_Name"])
+                    if contacts and contacts[0].get("id"):
+                        self._notes_for_record("Contacts", contacts[0]["id"], seen, out)
+
+            logger.info("Fetched %d CRM note(s) for address=%r contact=%r (deal_matched=%s)",
+                        len(out), address, contact_name, deal_matched)
+            return out[:max_notes]
+        except Exception as e:
+            logger.warning("Could not fetch CRM notes (address=%r, contact=%r): %s", address, contact_name, e)
+            return out[:max_notes]

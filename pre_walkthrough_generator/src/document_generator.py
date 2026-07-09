@@ -400,9 +400,9 @@ class DocumentGenerator:
             price_display = f"${price_num:,.2f}"
         elif property_info.get('price') not in (None, '', 'Information not available'):
             price_display = str(property_info.get('price'))
-        elif last_sold_num is not None and last_sold_date:
+        elif last_sold_num is not None and last_sold_date not in (None, '', 'Information not available'):
             price_display = f"Last sold: ${last_sold_num:,.2f} ({last_sold_date})"
-        elif last_sold_price and last_sold_date:
+        elif last_sold_price not in (None, '', 'Information not available') and last_sold_date not in (None, '', 'Information not available'):
             price_display = f"Last sold: {last_sold_price} ({last_sold_date})"
         else:
             price_display = 'Contact broker for pricing'
@@ -439,6 +439,8 @@ class DocumentGenerator:
             ('Bathrooms', bathrooms),
             ('Year Built', year_built),
             ('Property Type', property_type),
+            ('Lot Size', safe_get(property_info, 'lot_size')),
+            ('Assessed Value', safe_get(property_info, 'assessed_value')),
             ('HOA Fee', hoa_fee_display),
             ('Neighborhood', neighborhood)
         ]
@@ -1002,6 +1004,51 @@ class DocumentGenerator:
                 f"Showing the {len(display)} most relevant of {len(neighboring_projects)} projects in this neighborhood."
             )
 
+    def _add_site_feasibility(self, data: Dict[str, Any]):
+        """Zoning, flood zone, and renovation-feasibility notes from public-records research."""
+        NA = (None, '', 'Information not available')
+        zoning = data.get('research_zoning')
+        flood = data.get('research_flood')
+        notes = [str(n).strip() for n in (data.get('research_feasibility') or []) if str(n).strip()]
+        sources = [str(s).strip() for s in (data.get('research_sources') or []) if str(s).strip()]
+        has_kv = zoning not in NA or flood not in NA
+        if not has_kv and not notes:
+            return  # nothing researched — skip the section entirely
+        self._heading('Site & Feasibility', level=1)
+        if has_kv:
+            table = self.doc.add_table(rows=0, cols=2)
+            table.style = 'Table Grid'
+            table.autofit = True
+            for label, val in (('Zoning', zoning), ('Flood Zone', flood)):
+                if val not in NA:
+                    cells = table.add_row().cells
+                    cells[0].text = label
+                    cells[1].text = str(val)
+        for n in notes:
+            self.doc.add_paragraph(f"• {n}")
+        if sources:
+            p = self.doc.add_paragraph()
+            r = p.add_run('Research sources: ' + '; '.join(sources))
+            r.font.size = Pt(8)
+            r.font.color.rgb = RGBColor(0x88, 0x88, 0x88)
+
+    def _add_owner_profile(self, data: Dict[str, Any]):
+        """Ownership + public professional context (no personal/financial/family/social detail)."""
+        summary = data.get('owner_summary')
+        if not summary or str(summary).strip() in ('', 'Information not available'):
+            return
+        self._heading('Owner Profile', level=1)
+        self.doc.add_paragraph(str(summary).strip())
+
+    def _add_crm_notes(self, data: Dict[str, Any]):
+        """Relevant notes pulled from the matching Zoho CRM deal."""
+        notes = [str(n).strip() for n in (data.get('zoho_notes') or []) if str(n).strip()]
+        if not notes:
+            return
+        self._heading('CRM Notes', level=1)
+        for n in notes:
+            self.doc.add_paragraph(f"• {n}")
+
     def generate_report(self, data: Dict[str, Any], output_dir: str = "data", file_name: str = None) -> Optional[str]:
         """Generate the pre-walkthrough report.
 
@@ -1016,7 +1063,9 @@ class DocumentGenerator:
                 ('Header', self._add_header),
                 ('Executive Summary', self._add_executive_summary),
                 ('Property Details', self._add_property_details),
+                ('Site & Feasibility', self._add_site_feasibility),
                 ('Client Details', self._add_client_details),
+                ('Owner Profile', self._add_owner_profile),
                 ('Property Links', self._add_property_links),
                 ('Building Requirements', self._add_building_requirements),
                 ('Renovation Scope', self._add_renovation_scope),
@@ -1025,6 +1074,7 @@ class DocumentGenerator:
                 ('Budget Summary', self._add_budget_summary),
                 ('Project Management', self._add_project_management),
                 ('Neighboring Projects', self._add_neighboring_projects),
+                ('CRM Notes', self._add_crm_notes),
                 ('Notes', self._add_notes),
             ]
 

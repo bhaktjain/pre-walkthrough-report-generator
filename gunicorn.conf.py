@@ -9,7 +9,7 @@ backlog = 2048
 workers = 1  # Start with 1 worker for Render's free tier
 worker_class = "uvicorn.workers.UvicornWorker"
 worker_connections = 1000
-timeout = 180
+timeout = 600  # allow multi-minute deep property research on the report endpoint
 keepalive = 2
 
 # Restart workers after this many requests, to help prevent memory leaks
