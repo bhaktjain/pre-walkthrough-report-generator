@@ -335,16 +335,19 @@ def process_transcript_and_generate_report(transcript_path: str, address: str = 
             logger.error(f"Error fetching neighboring projects: {e}")
 
         # --- Matching deal's CRM notes (best-effort) ---
+        # CRM notes temporarily DISABLED per request. Leaving zoho_notes empty
+        # makes the report's "CRM Notes" section self-suppress (see
+        # _add_crm_notes). Re-enable by un-commenting the fetch below.
         zoho_notes = []
-        try:
-            zc = (os.environ.get("ZOHO_CLIENT_ID") or config_obj.zoho_client_id,
-                  os.environ.get("ZOHO_CLIENT_SECRET") or config_obj.zoho_client_secret,
-                  os.environ.get("ZOHO_REFRESH_TOKEN") or config_obj.zoho_refresh_token)
-            if all(zc):
-                from zoho_api import ZohoAPI
-                zoho_notes = ZohoAPI(*zc).get_relevant_notes(address=address, contact_name=owner_name)
-        except Exception as e:
-            logger.error(f"Error fetching CRM notes: {e}")
+        # try:
+        #     zc = (os.environ.get("ZOHO_CLIENT_ID") or config_obj.zoho_client_id,
+        #           os.environ.get("ZOHO_CLIENT_SECRET") or config_obj.zoho_client_secret,
+        #           os.environ.get("ZOHO_REFRESH_TOKEN") or config_obj.zoho_refresh_token)
+        #     if all(zc):
+        #         from zoho_api import ZohoAPI
+        #         zoho_notes = ZohoAPI(*zc).get_relevant_notes(address=address, contact_name=owner_name)
+        # except Exception as e:
+        #     logger.error(f"Error fetching CRM notes: {e}")
 
         # --- Assemble report data ---
         final_data = {
