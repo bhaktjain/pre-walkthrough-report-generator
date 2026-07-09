@@ -450,7 +450,14 @@ class DocumentGenerator:
         bedrooms = safe_get(property_info, 'bedrooms')
         bathrooms = safe_get(property_info, 'bathrooms')
         sqft = property_info.get('sqft')
-        sqft_display = f"{sqft} sq ft" if sqft not in (None, '', [], 'Information not available') else 'Information not available'
+        if sqft in (None, '', [], 'Information not available'):
+            sqft_display = 'Information not available'
+        else:
+            _s = str(sqft).strip()
+            _sl = _s.lower()
+            # Don't append "sq ft" when the model already included a unit
+            # ("~1,574 sq ft" -> avoid "~1,574 sq ft sq ft").
+            sqft_display = _s if (('sq' in _sl and 'ft' in _sl) or 'ft²' in _sl or 'feet' in _sl) else f"{_s} sq ft"
         year_built = safe_get(property_info, 'year_built')
         property_type = safe_get(property_info, 'property_type')
         if isinstance(property_type, str) and property_type != 'Information not available':
