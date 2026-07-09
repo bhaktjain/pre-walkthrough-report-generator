@@ -639,6 +639,17 @@ def _run_report_job(job_id: str, flattened: str, address: Optional[str], last_na
         _report_jobs[job_id] = {"status": "error", "error": str(e), "ts": time.time()}
 
 
+def _absolute_base_url(http_request: Request) -> str:
+    """Public base URL (scheme://host) for building absolute poll links. Render
+    terminates TLS at its proxy, so prefer the forwarded proto/host. Power
+    Automate / Logic Apps only follows an ABSOLUTE Location header — every 202
+    (the initial POST AND each running poll) must hand back an absolute URL, or
+    the runtime stops polling after one cycle and returns the interim body."""
+    proto = http_request.headers.get("x-forwarded-proto", http_request.url.scheme or "https")
+    host = http_request.headers.get("x-forwarded-host") or http_request.headers.get("host")
+    return f"{proto}://{host}" if host else str(http_request.base_url).rstrip("/")
+
+
 @app.post("/generate-report-from-text-async")
 async def generate_report_from_text_async(request: TranscriptRequest, http_request: Request):
     """Start report generation (incl. multi-minute web research) and return 202 + Location.
@@ -664,14 +675,7 @@ async def generate_report_from_text_async(request: TranscriptRequest, http_reque
         daemon=True,
     ).start()
     logger.info("Started async report job %s (address=%r)", job_id, request.address)
-    # Return an ABSOLUTE Location URL. Power Automate's "Asynchronous pattern"
-    # (and Logic Apps) needs an absolute URL to poll; a relative path is not
-    # reliably followed. Build it from the proxy-forwarded host/proto (Render
-    # terminates TLS at its proxy) so the URL is the public https endpoint.
-    fwd_proto = http_request.headers.get("x-forwarded-proto", http_request.url.scheme or "https")
-    fwd_host = http_request.headers.get("x-forwarded-host") or http_request.headers.get("host")
-    base = f"{fwd_proto}://{fwd_host}" if fwd_host else str(http_request.base_url).rstrip("/")
-    location = f"{base}/report-status/{job_id}"
+    location = f"{_absolute_base_url(http_request)}/report-status/{job_id}"
     return JSONResponse(
         status_code=202,
         content={"job_id": job_id, "status": "running", "status_url": location},
@@ -680,16 +684,19 @@ async def generate_report_from_text_async(request: TranscriptRequest, http_reque
 
 
 @app.get("/report-status/{job_id}")
-async def report_status(job_id: str):
+async def report_status(job_id: str, http_request: Request):
     """Poll target for an async report: 202 while running, 200 with the .docx when done."""
     job = _report_jobs.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Unknown or expired job id")
     if job["status"] == "running":
+        # Absolute Location so the async-pattern poller keeps polling (a relative
+        # next-poll URL here is why it stopped after one cycle / ~20s).
+        location = f"{_absolute_base_url(http_request)}/report-status/{job_id}"
         return JSONResponse(
             status_code=202,
-            content={"status": "running"},
-            headers={"Location": f"/report-status/{job_id}", "Retry-After": "20"},
+            content={"status": "running", "status_url": location},
+            headers={"Location": location, "Retry-After": "20"},
         )
     if job["status"] == "error":
         raise HTTPException(status_code=500, detail=job.get("error", "Report generation failed"))
