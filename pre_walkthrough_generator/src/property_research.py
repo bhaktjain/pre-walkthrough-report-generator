@@ -107,31 +107,36 @@ def research_property(
     model: str = DEFAULT_MODEL,
     effort: str = "low",
     max_searches: int = 5,
-    max_fetches: int = 3,
-    use_thinking: bool = True,
+    max_fetches: int = 1,
+    use_thinking: bool = False,
+    timeout: float = 260.0,
 ) -> Optional[Dict[str, Any]]:
     """Research a property (and lightly, its owner) from public web sources.
 
-    Tuned for the report pipeline's latency budget: low effort + capped searches
-    keep it well under the worker timeout. Raise ``effort``/``max_searches`` for
-    a deeper (slower) dossier when latency isn't a concern.
+    HARD-BOUNDED for the report pipeline: basic web search (no dynamic-filtering
+    code-exec), no page fetches, no extended thinking, a strict per-call client
+    timeout, and a 2-call cap. Deep runs (page fetches, thinking, more searches)
+    are minutes-to-tens-of-minutes long and are NOT used here — pass richer args
+    explicitly for an offline dossier.
 
     Returns {property_details, feasibility, owner_summary, sources, found} or
-    None on any failure. Never raises.
+    None on any failure/timeout. Never raises.
     """
     if anthropic is None or not anthropic_api_key or not address:
         logger.info("Property research skipped (no SDK / key / address)")
         return None
     try:
-        client = anthropic.Anthropic(api_key=anthropic_api_key)
+        # Hard client-side timeout + no retries so one report can't hang for
+        # tens of minutes on a slow search loop.
+        client = anthropic.Anthropic(api_key=anthropic_api_key, timeout=timeout, max_retries=0)
 
-        # 1. Research with server-side web search (+ optional page fetch). Page
-        # fetches are the slow part, so max_fetches=0 skips the fetch tool.
-        tools = [{"type": "web_search_20260209", "name": "web_search", "max_uses": max_searches}]
+        # Basic web search is much faster than the _20260209 (dynamic-filtering)
+        # variant. Page fetches are the slowest part, so they default off.
+        tools = [{"type": "web_search_20250305", "name": "web_search", "max_uses": max_searches}]
         if max_fetches > 0:
-            tools.append({"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": max_fetches})
+            tools.append({"type": "web_fetch_20250910", "name": "web_fetch", "max_uses": max_fetches})
         create_kwargs = dict(
-            model=model, max_tokens=6000,
+            model=model, max_tokens=4000,
             output_config={"effort": effort},
             tools=tools,
         )
@@ -139,7 +144,7 @@ def research_property(
             create_kwargs["thinking"] = {"type": "adaptive"}
         messages = [{"role": "user", "content": _research_prompt(address, owner_name)}]
         response = None
-        for _ in range(6):  # cap pause_turn continuations
+        for _ in range(2):  # at most one pause_turn continuation
             response = client.messages.create(messages=messages, **create_kwargs)
             if response.stop_reason == "pause_turn":
                 messages.append({"role": "assistant", "content": response.content})
