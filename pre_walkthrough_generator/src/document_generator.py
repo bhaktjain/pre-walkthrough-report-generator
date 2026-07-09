@@ -49,6 +49,24 @@ def _to_number(value) -> Optional[float]:
     return None
 
 
+def _leading_money(value) -> Optional[float]:
+    """Extract a leading currency amount even when trailing prose follows, e.g.
+    "$736,000 (sold Sep 25, 2025)" -> 736000.0. Returns None if there's no
+    leading number. Used only for price display so a model-annotated price still
+    renders as a clean dollar figure (and doesn't duplicate the sale date)."""
+    n = _to_number(value)
+    if n is not None:
+        return n
+    import re as _re
+    m = _re.match(r'\s*\$?\s*(\d[\d,]*(?:\.\d+)?)', str(value or ''))
+    if m:
+        try:
+            return float(m.group(1).replace(',', ''))
+        except ValueError:
+            return None
+    return None
+
+
 # Palette (matches the report preview): brand near-black + warm neutrals.
 LABEL_FILL = 'F4F2EE'    # shaded label column
 ZEBRA_FILL = 'FAF9F7'    # alternating value rows
@@ -391,15 +409,17 @@ class DocumentGenerator:
         property_info = data.get('property_details', {}) or {}
 
         # Price (fallback to last sold price)
-        price_num = _to_number(property_info.get('price'))
+        price_num = _leading_money(property_info.get('price'))
         last_sold_price = property_info.get('last_sold_price')
         last_sold_date = property_info.get('last_sold_date')
-        last_sold_num = _to_number(last_sold_price)
+        last_sold_num = _leading_money(last_sold_price)
 
         # Label the row honestly: a genuine active-listing price is "Current
         # Price", but a historical sale (the usual case for researched off-market
         # homes) is "Last Sold Price" — never present a years-old purchase as the
-        # current value. Append the sale date when known.
+        # current value. Append the sale date when known. Using _leading_money
+        # normalizes a model-annotated price ("$736,000 (sold Sep 25...)") to a
+        # clean dollar figure so the date isn't rendered twice.
         _has_date = last_sold_date not in (None, '', 'Information not available')
         if price_num is not None:
             price_label, price_display = 'Current Price', f"${price_num:,.2f}"
@@ -448,6 +468,7 @@ class DocumentGenerator:
             ('Property Type', property_type),
             ('Lot Size', safe_get(property_info, 'lot_size')),
             ('Assessed Value', safe_get(property_info, 'assessed_value')),
+            ('Property Taxes', safe_get(property_info, 'property_taxes')),
             ('HOA Fee', hoa_fee_display),
             ('Neighborhood', neighborhood)
         ]
@@ -1062,7 +1083,15 @@ class DocumentGenerator:
         if not summary or str(summary).strip() in ('', 'Information not available'):
             return
         self._heading('Owner Profile', level=1)
-        self.doc.add_paragraph(str(summary).strip())
+        # The research composes owner_summary as short labeled lines separated by
+        # newlines (Ownership / Tenure / Profession / …). Render each as its own
+        # bullet; fall back to a single paragraph if it came back as prose.
+        lines = [ln.strip().lstrip('•-').strip() for ln in str(summary).splitlines() if ln.strip()]
+        if len(lines) > 1:
+            for ln in lines:
+                self.doc.add_paragraph(f"• {ln}")
+        else:
+            self.doc.add_paragraph(str(summary).strip())
 
     def _add_crm_notes(self, data: Dict[str, Any]):
         """Relevant notes pulled from the matching Zoho CRM deal."""

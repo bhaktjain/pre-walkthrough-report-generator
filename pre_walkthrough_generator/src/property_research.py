@@ -38,7 +38,7 @@ _RESEARCH_SCHEMA = {
     "required": [
         "found", "bedrooms", "bathrooms", "sqft", "year_built", "property_type",
         "lot_size", "last_sale_price", "last_sale_date", "assessed_value",
-        "zoning", "flood_zone", "neighborhood", "feasibility_notes",
+        "property_taxes", "zoning", "flood_zone", "neighborhood", "feasibility_notes",
         "owner_summary", "sources",
     ],
     "properties": {
@@ -52,6 +52,7 @@ _RESEARCH_SCHEMA = {
         "last_sale_price": {"type": "string"},
         "last_sale_date": {"type": "string"},
         "assessed_value": {"type": "string"},
+        "property_taxes": {"type": "string", "description": "annual property taxes"},
         "zoning": {"type": "string", "description": "zoning district + key setback/lot-coverage limits if found"},
         "flood_zone": {"type": "string", "description": "FEMA flood zone designation"},
         "neighborhood": {"type": "string"},
@@ -61,7 +62,7 @@ _RESEARCH_SCHEMA = {
         },
         "owner_summary": {
             "type": "string",
-            "description": "Ownership confirmation from the public deed/tax record, plus any PUBLIC, professionally-relevant context. Do NOT include personal, financial, family, or social-media details.",
+            "description": "Short labeled lines separated by newlines (Ownership / Tenure / Profession / Business-Employer / Other properties / For the meeting). PUBLIC professional and property-record context only — no personal, financial, family, or social-media details.",
         },
         "sources": {"type": "array", "items": {"type": "string", "description": "source URL"}},
     },
@@ -69,34 +70,58 @@ _RESEARCH_SCHEMA = {
 
 
 def _research_prompt(address: str, owner_name: Optional[str]) -> str:
-    owner_line = (
-        f"\nThe owner on file may be: {owner_name}. Confirm current ownership from the public deed/tax "
-        "record and how long they have owned the home. Then gather PUBLIC, professionally-relevant "
-        "context that helps the salesperson build rapport and gauge project scope/budget: the owner's "
-        "profession, employer or business, public professional profiles (LinkedIn, company site, "
-        "professional bios), and any other properties they own per public records. "
-        "Do NOT compile private personal information: no personal finances/income/net-worth estimates, "
-        "no family or household details beyond what is already known, and no social-media or personal-life "
-        "profiling. Stick to public professional and property-record information."
-        if owner_name else
-        "\nIdentify the current owner of record from the public deed/tax record, and note any public "
-        "professional profile (profession, employer/business) that helps tailor a renovation proposal. "
-        "Public professional and property-record information only — no personal/financial/family/social digging."
+    person = owner_name.strip() if owner_name else None
+    person_line = (
+        f"The salesperson's walkthrough is with: {person}. Treat this person as the primary subject. "
+        f"First confirm whether {person} is the current owner of record from the public deed/tax record; "
+        f"if the record shows a different owner, report BOTH and flag the mismatch.\n"
+        if person else
+        "Identify the current owner of record from the public deed/tax record.\n"
     )
     return (
-        f"You are preparing an internal pre-walkthrough research brief for a renovation contractor's "
-        f"salesperson. Research the residential property at:\n\n    {address}\n\n"
-        "Use web search and fetch authoritative PUBLIC sources — the county tax assessor / property "
-        "records, state parcel/GIS databases (e.g. njparcels, njpropertyrecords, county GIS), the FEMA "
-        "flood map, the municipal zoning code, and Zillow/Redfin/Realtor public listing pages for "
-        "historical facts. Cross-check across sources and prefer the county/assessor record for facts.\n\n"
-        "Find: beds, baths, living-area square footage, year built, property type, lot size, last sale "
-        "price & date, assessed value, zoning district (with setback/lot-coverage limits if available), "
-        "and FEMA flood zone. Also surface renovation-relevant feasibility facts: municipal sewer vs. "
-        "septic, any additions/permits on record, and whether the lot has room to build out within the "
-        "zoning envelope."
-        + owner_line +
-        "\n\nBe factual and cite your sources. If a fact cannot be found, say so rather than guessing."
+        "You are preparing an internal pre-walkthrough research brief for a renovation contractor's "
+        "salesperson, who will meet the homeowner at the property. Be THOROUGH and specific — this brief "
+        "should let the rep walk in fully informed. Research the residential property at:\n\n"
+        f"    {address}\n\n"
+        "=== OBJECTIVE 1: THE PERSON (owner / first-call contact) ===\n"
+        + person_line +
+        "Then gather PUBLIC, professionally-relevant context to help the rep gauge project scope/budget "
+        "and build rapport:\n"
+        "  - how long they have owned this home, and the purchase price/date (public record)\n"
+        "  - their profession, job title, and the employer or business they own or run\n"
+        "  - public professional profiles (LinkedIn, company website, professional bios, licensing "
+        "boards, notable press) — VERIFY it is the same person (matching locale/role); if a profile "
+        "might be a different individual with the same name, say so explicitly and do NOT rely on it\n"
+        "  - any OTHER properties they own per public records (a portfolio/repeat-client signal)\n"
+        "Compose owner_summary as short labeled lines separated by newlines, for example:\n"
+        "  'Ownership: ...' / 'Tenure: ...' / 'Profession: ...' / 'Business/Employer: ...' / "
+        "'Other properties: ...' / 'For the meeting: ...'. Include only lines you have real public info for.\n"
+        "PRIVACY BOUNDARY (strict): PUBLIC professional and property-record information ONLY. Do NOT "
+        "compile personal finances/income/net-worth estimates, family or household details, or "
+        "social-media / personal-life profiling. If something is not publicly and professionally "
+        "relevant, leave it out.\n\n"
+        "=== OBJECTIVE 2: THE PROPERTY (building, unit, and site) ===\n"
+        "Get everything available:\n"
+        "  - beds, baths, interior living square footage, year built, number of stories/floors, "
+        "property type, lot size\n"
+        "  - for a CONDO or CO-OP unit: the UNIT's beds/baths/interior sqft and floor from listing "
+        "history, PLUS building info (year built, number of units/stories), the monthly HOA / "
+        "maintenance / common charges, and whether it is a condo vs. co-op\n"
+        "  - last sale price & date, and prior sale history if available\n"
+        "  - assessed value and annual property taxes\n"
+        "  - zoning district with setback / lot-coverage / FAR limits\n"
+        "  - FEMA flood zone\n"
+        "  - renovation-relevant feasibility: municipal sewer vs. septic, any additions / permits / DOB "
+        "records, landmark or historic-district status, and whether the lot/unit has room to build out "
+        "or reconfigure within the zoning/board envelope\n\n"
+        "=== SOURCES ===\n"
+        "Use authoritative PUBLIC sources and cross-check. For NYC: StreetEasy, PropertyShark, ACRIS "
+        "(a836-acris.nyc.gov), NYC ZoLa (zola.planning.nyc.gov), DOB NOW / BIS, and NYC landmark maps. "
+        "For NJ: njpropertyrecords, njparcels, and the county tax assessor. For CT/other: the county or "
+        "town assessor (e.g. vgsi) and GIS. Everywhere: Zillow/Redfin/Realtor listing history, and FEMA "
+        "msc.fema.gov for flood. Prefer the county/assessor record for facts.\n\n"
+        "Be factual and cite your sources. If a specific fact cannot be found, use the exact phrase "
+        "'Information not available' for it rather than guessing."
     )
 
 
@@ -106,18 +131,19 @@ def research_property(
     owner_name: Optional[str] = None,
     model: str = DEFAULT_MODEL,
     effort: str = "low",
-    max_searches: int = 5,
-    max_fetches: int = 1,
+    max_searches: int = 8,
+    max_fetches: int = 2,
     use_thinking: bool = False,
-    timeout: float = 260.0,
+    timeout: float = 420.0,
 ) -> Optional[Dict[str, Any]]:
     """Research a property (and lightly, its owner) from public web sources.
 
-    HARD-BOUNDED for the report pipeline: basic web search (no dynamic-filtering
-    code-exec), no page fetches, no extended thinking, a strict per-call client
-    timeout, and a 2-call cap. Deep runs (page fetches, thinking, more searches)
-    are minutes-to-tens-of-minutes long and are NOT used here — pass richer args
-    explicitly for an offline dossier.
+    Tuned for DEPTH within a bounded latency budget: basic web search (no
+    dynamic-filtering code-exec), a couple of targeted page fetches, no extended
+    thinking, and a strict per-call client timeout so one report can never hang.
+    The hard timeout + max_retries=0 guarantee a graceful None on a slow run
+    rather than a stuck worker. (Extended thinking + the dynamic-filtering tools
+    are what previously pushed this to 15+ minutes; they stay off.)
 
     Returns {property_details, feasibility, owner_summary, sources, found} or
     None on any failure/timeout. Never raises.
@@ -136,7 +162,7 @@ def research_property(
         if max_fetches > 0:
             tools.append({"type": "web_fetch_20250910", "name": "web_fetch", "max_uses": max_fetches})
         create_kwargs = dict(
-            model=model, max_tokens=4000,
+            model=model, max_tokens=6000,
             output_config={"effort": effort},
             tools=tools,
         )
@@ -144,7 +170,7 @@ def research_property(
             create_kwargs["thinking"] = {"type": "adaptive"}
         messages = [{"role": "user", "content": _research_prompt(address, owner_name)}]
         response = None
-        for _ in range(2):  # at most one pause_turn continuation
+        for _ in range(4):  # allow a few pause_turn continuations for the deeper search/fetch rounds
             response = client.messages.create(messages=messages, **create_kwargs)
             if response.stop_reason == "pause_turn":
                 messages.append({"role": "assistant", "content": response.content})
@@ -203,6 +229,7 @@ def research_property(
             "property_type": _v("property_type"),
             "lot_size": _v("lot_size"),
             "assessed_value": _v("assessed_value"),
+            "property_taxes": _v("property_taxes"),
             "neighborhood": _v("neighborhood"),
             "photos": [],
             "floor_plans": [],
