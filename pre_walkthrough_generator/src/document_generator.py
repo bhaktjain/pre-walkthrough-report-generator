@@ -396,16 +396,23 @@ class DocumentGenerator:
         last_sold_date = property_info.get('last_sold_date')
         last_sold_num = _to_number(last_sold_price)
 
+        # Label the row honestly: a genuine active-listing price is "Current
+        # Price", but a historical sale (the usual case for researched off-market
+        # homes) is "Last Sold Price" — never present a years-old purchase as the
+        # current value. Append the sale date when known.
+        _has_date = last_sold_date not in (None, '', 'Information not available')
         if price_num is not None:
-            price_display = f"${price_num:,.2f}"
+            price_label, price_display = 'Current Price', f"${price_num:,.2f}"
         elif property_info.get('price') not in (None, '', 'Information not available'):
-            price_display = str(property_info.get('price'))
-        elif last_sold_num is not None and last_sold_date not in (None, '', 'Information not available'):
-            price_display = f"Last sold: ${last_sold_num:,.2f} ({last_sold_date})"
-        elif last_sold_price not in (None, '', 'Information not available') and last_sold_date not in (None, '', 'Information not available'):
-            price_display = f"Last sold: {last_sold_price} ({last_sold_date})"
+            price_label, price_display = 'Current Price', str(property_info.get('price'))
+        elif last_sold_num is not None:
+            price_label = 'Last Sold Price'
+            price_display = f"${last_sold_num:,.2f} ({last_sold_date})" if _has_date else f"${last_sold_num:,.2f}"
+        elif last_sold_price not in (None, '', 'Information not available'):
+            price_label = 'Last Sold Price'
+            price_display = f"{last_sold_price} ({last_sold_date})" if _has_date else str(last_sold_price)
         else:
-            price_display = 'Contact broker for pricing'
+            price_label, price_display = 'Current Price', 'Contact broker for pricing'
 
         # HOA fee
         hoa_num = _to_number(property_info.get('hoa_fee'))
@@ -433,7 +440,7 @@ class DocumentGenerator:
         neighborhood = safe_get(property_info, 'neighborhood')
 
         details = [
-            ('Current Price', price_display),
+            (price_label, price_display),
             ('Square Footage', sqft_display),
             ('Bedrooms', bedrooms),
             ('Bathrooms', bathrooms),
@@ -1027,8 +1034,25 @@ class DocumentGenerator:
         for n in notes:
             self.doc.add_paragraph(f"• {n}")
         if sources:
+            # Reduce each source to a display-safe token (domain for URLs) so a
+            # long raw URL can't overflow the right margin on the SharePoint/iOS
+            # docx preview, which does not break within an unbroken URL token.
+            from urllib.parse import urlparse
+
+            def _src_label(s):
+                s = str(s).strip()
+                if s.startswith(('http://', 'https://')):
+                    netloc = (urlparse(s).netloc or s).strip()
+                    return netloc[4:] if netloc.startswith('www.') else netloc
+                return s if len(s) <= 40 else s[:40].rstrip() + '…'
+
+            labels = []
+            for s in sources:
+                lbl = _src_label(s)
+                if lbl and lbl not in labels:
+                    labels.append(lbl)
             p = self.doc.add_paragraph()
-            r = p.add_run('Research sources: ' + '; '.join(sources))
+            r = p.add_run('Research sources: ' + '; '.join(labels))
             r.font.size = Pt(8)
             r.font.color.rgb = RGBColor(0x88, 0x88, 0x88)
 

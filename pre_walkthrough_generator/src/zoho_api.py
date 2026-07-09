@@ -273,7 +273,12 @@ class ZohoAPI:
                     if isinstance(cn, dict) and cn.get("id"):
                         self._notes_for_record("Contacts", cn["id"], seen, out)
 
-            # 2. Fallback: exact contact-name match (only if the deal path found nothing)
+            # 2. Fallback: exact contact-name match (only if the deal path found nothing).
+            #    This is the PRIMARY path in practice — deals are named by project
+            #    title, not street, so the address match above usually returns
+            #    nothing. Trust ONLY a UNIQUE name match: two contacts named e.g.
+            #    "John Smith" are ambiguous, and pulling contacts[0] would surface a
+            #    different client's private notes (same guard as the deal path).
             if not out and contact_name:
                 parts = self._coql_safe(contact_name).split()
                 if len(parts) >= 2:
@@ -281,8 +286,11 @@ class ZohoAPI:
                     contacts = self.search_records(
                         "Contacts", f"((Last_Name:equals:{last})and(First_Name:equals:{first}))",
                         fields=["Full_Name"])
-                    if contacts and contacts[0].get("id"):
+                    if len(contacts) == 1 and contacts[0].get("id"):
                         self._notes_for_record("Contacts", contacts[0]["id"], seen, out)
+                    elif len(contacts) > 1:
+                        logger.info("Ambiguous contact match for %r (%d candidates) — skipping contact notes",
+                                    contact_name, len(contacts))
 
             logger.info("Fetched %d CRM note(s) for address=%r contact=%r (deal_matched=%s)",
                         len(out), address, contact_name, deal_matched)

@@ -157,7 +157,7 @@ def research_property(
 
         # 2. Structure the findings (separate call — no tools, so output_config.format is clean).
         struct = client.messages.create(
-            model=model, max_tokens=3000,
+            model=model, max_tokens=6000,  # ample headroom so the JSON isn't truncated
             messages=[{
                 "role": "user",
                 "content": (
@@ -169,7 +169,19 @@ def research_property(
             output_config={"effort": "low", "format": {"type": "json_schema", "schema": _RESEARCH_SCHEMA}},
         )
         raw = next((b.text for b in struct.content if getattr(b, "type", None) == "text"), "")
-        data = json.loads(raw)
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            # Salvage a slow, already-successful research run whose structuring
+            # JSON came back wrapped in prose/markdown — grab the outermost {...}
+            # rather than discarding everything. Genuinely truncated JSON still
+            # fails here and degrades gracefully via the outer handler.
+            import re as _re
+            m = _re.search(r"\{.*\}", raw, _re.DOTALL)
+            if not m:
+                logger.warning("Property research structuring returned unparseable JSON for '%s'", address)
+                return None
+            data = json.loads(m.group(0))
 
         def _v(key: str) -> str:
             val = str(data.get(key) or "").strip()
@@ -177,7 +189,11 @@ def research_property(
 
         property_details = {
             "address": address,
-            "price": _v("last_sale_price"),
+            # This pipeline researches OWNED (off-market) homes — there is no
+            # active list price, so leave 'price' as the sentinel. The document
+            # generator then renders the sale under a "Last Sold Price" label
+            # instead of mislabeling a years-old purchase as the current price.
+            "price": "Information not available",
             "last_sold_price": _v("last_sale_price"),
             "last_sold_date": _v("last_sale_date"),
             "bedrooms": _v("bedrooms"),
