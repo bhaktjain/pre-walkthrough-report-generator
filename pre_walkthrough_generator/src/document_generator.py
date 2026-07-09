@@ -649,13 +649,16 @@ class DocumentGenerator:
                         _shade_cell(cells[1], ZEBRA_FILL)
                 elif ncols == 3:
                     if r_idx == 0:
-                        # Dark header row with white, bold text.
+                        # Header row: light fill + bold DARK text. White-on-dark
+                        # vanishes in renderers that drop cell shading (e.g. the
+                        # SharePoint preview), so keep the text dark and legible
+                        # whether or not the shading renders.
                         for cell in cells:
-                            _shade_cell(cell, HEADER_FILL)
+                            _shade_cell(cell, LABEL_FILL)
                             for paragraph in cell.paragraphs:
                                 for run in paragraph.runs:
                                     run.font.bold = True
-                                    run.font.color.rgb = WHITE
+                                    run.font.color.rgb = HEADING_COLOR
                     elif r_idx % 2 == 0:
                         for cell in cells:
                             _shade_cell(cell, ZEBRA_FILL)
