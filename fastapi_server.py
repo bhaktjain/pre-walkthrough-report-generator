@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Header, Depends
+from fastapi import FastAPI, HTTPException, UploadFile, File, Header, Depends, Request
 from fastapi.responses import FileResponse, JSONResponse
 import uvicorn
 import tempfile
@@ -640,7 +640,7 @@ def _run_report_job(job_id: str, flattened: str, address: Optional[str], last_na
 
 
 @app.post("/generate-report-from-text-async")
-async def generate_report_from_text_async(request: TranscriptRequest):
+async def generate_report_from_text_async(request: TranscriptRequest, http_request: Request):
     """Start report generation (incl. multi-minute web research) and return 202 + Location.
 
     Poll the Location URL until it returns the .docx (200). Enable Power
@@ -664,10 +664,18 @@ async def generate_report_from_text_async(request: TranscriptRequest):
         daemon=True,
     ).start()
     logger.info("Started async report job %s (address=%r)", job_id, request.address)
+    # Return an ABSOLUTE Location URL. Power Automate's "Asynchronous pattern"
+    # (and Logic Apps) needs an absolute URL to poll; a relative path is not
+    # reliably followed. Build it from the proxy-forwarded host/proto (Render
+    # terminates TLS at its proxy) so the URL is the public https endpoint.
+    fwd_proto = http_request.headers.get("x-forwarded-proto", http_request.url.scheme or "https")
+    fwd_host = http_request.headers.get("x-forwarded-host") or http_request.headers.get("host")
+    base = f"{fwd_proto}://{fwd_host}" if fwd_host else str(http_request.base_url).rstrip("/")
+    location = f"{base}/report-status/{job_id}"
     return JSONResponse(
         status_code=202,
-        content={"job_id": job_id, "status": "running"},
-        headers={"Location": f"/report-status/{job_id}", "Retry-After": "20"},
+        content={"job_id": job_id, "status": "running", "status_url": location},
+        headers={"Location": location, "Retry-After": "20"},
     )
 
 
