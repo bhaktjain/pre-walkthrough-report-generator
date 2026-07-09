@@ -1569,6 +1569,31 @@ _STATE_ABBREV = {
 }
 _STATE_CODES = set(_STATE_ABBREV.values())
 
+# City names that mean "inside the five boroughs" (NYC neighborhood granularity).
+_NYC_BOROUGHS = {"new york", "new york city", "nyc", "manhattan", "brooklyn",
+                 "bronx", "queens", "staten island"}
+
+
+def _is_nyc_zip(zc) -> bool:
+    """True only for ZIP codes inside the five boroughs.
+
+    Used to keep NYC-neighborhood granularity for real NYC addresses while
+    letting nearby non-NYC NY places (Westchester, Long Island, the Hamptons)
+    resolve to their own town — a plain ZIP_TO_NEIGHBORHOOD lookup can't do this
+    because that table also contains suburban ZIPs.
+    """
+    s = str(zc or "").strip()[:5]
+    if not s.isdigit():
+        return False
+    z = int(s)
+    return (10001 <= z <= 10282 or   # Manhattan
+            10301 <= z <= 10314 or   # Staten Island
+            10451 <= z <= 10475 or   # Bronx
+            11201 <= z <= 11256 or   # Brooklyn
+            z in (11004, 11005) or   # Queens (Glen Oaks / Floral Park P.O.)
+            11101 <= z <= 11109 or   # Queens (LIC, Astoria, Sunnyside, Woodside…)
+            11351 <= z <= 11697)     # Queens (Flushing, Jamaica, Rockaways…)
+
 
 def _abbrev_state(state) -> Optional[str]:
     if not state:
@@ -1605,6 +1630,26 @@ def get_locality(address: str, use_geocoding: bool = False) -> Optional[str]:
     """
     if not address:
         return None
+    # 0. Decide NYC vs. elsewhere BEFORE any street-name matching, so an NYC
+    #    street name can't mis-tag an address that isn't in the five boroughs
+    #    (e.g. "Ocean Ave, Jersey City, NJ" -> Flatbush, or "Park Ave, Scarsdale,
+    #    NY" -> Murray Hill). Only true NYC (a borough name or a NYC ZIP) and
+    #    Miami (FL) keep neighborhood-level granularity; every other place
+    #    resolves to its own "City, ST".
+    explicit = _locality_from_address_string(address)
+    if explicit:
+        state = explicit.rsplit(",", 1)[-1].strip().upper()
+        city = explicit.rsplit(",", 1)[0].strip().lower()
+        if state not in ("NY", "FL"):
+            return explicit
+        if state == "NY":
+            # Use the LITERAL trailing ZIP (not get_zip_from_address, which infers
+            # a ZIP from the street name and would wrongly map an NYC street in a
+            # suburb to a borough ZIP).
+            zm = re.search(r'\b(\d{5})(?:-\d{4})?\s*$', address.strip())
+            in_nyc = city in _NYC_BOROUGHS or _is_nyc_zip(zm.group(1) if zm else None)
+            if not in_nyc:
+                return explicit
     # 1. NYC neighborhood (most precise inside the five boroughs).
     hood = get_neighborhood_from_address(address, use_geocoding=False)
     if hood:
