@@ -573,23 +573,27 @@ class DocumentGenerator:
                     logger.warning("Could not embed property photo: %s", e)
 
     def _download_image(self, url: str) -> Optional[BytesIO]:
-        """Download an image and return it as a BytesIO (converted to PNG if needed)."""
+        """Download an image, downscale + re-encode as JPEG so an embedded photo or
+        floor plan can't bloat the .docx (a full-res photo was producing ~4 MB
+        reports — bad for SharePoint upload + mobile preview). If PIL can't process
+        it, return None (skip the embed) rather than dumping un-sized raw bytes."""
+        MAX_DIM = 1400  # px on the long side — plenty for a report image
         try:
             response = requests.get(url, timeout=IMAGE_DOWNLOAD_TIMEOUT)
             if response.status_code != 200:
                 logger.error("Image download failed: %s (status %s)", url, response.status_code)
                 return None
             try:
-                img = Image.open(BytesIO(response.content))
-                if img.format != 'PNG':
-                    output = BytesIO()
-                    img.convert('RGB').save(output, format='PNG')
-                    output.seek(0)
-                    return output
-                return BytesIO(response.content)
+                img = Image.open(BytesIO(response.content)).convert('RGB')
+                if max(img.size) > MAX_DIM:
+                    img.thumbnail((MAX_DIM, MAX_DIM))
+                output = BytesIO()
+                img.save(output, format='JPEG', quality=85, optimize=True)
+                output.seek(0)
+                return output
             except Exception as pil_e:
                 logger.error("PIL could not process image %s: %s", url, pil_e)
-                return BytesIO(response.content)
+                return None
         except Exception as e:
             logger.error("Exception downloading image %s: %s", url, e)
         return None
