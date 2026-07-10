@@ -586,11 +586,24 @@ class DocumentGenerator:
         return None
 
     def _add_client_details(self, data: Dict[str, Any]):
-        """Add client details section"""
+        """Add client details section. Leads with the research-derived background
+        (professional identity/leads, ownership, tenure, meeting prep) at the TOP —
+        this is the section the rep cares about most — then the contact/preferences
+        table."""
         self._heading('Client Details', level=1)
 
         transcript_info = data.get('transcript_info', {}) or {}
         client_info = transcript_info.get('client_info', {}) or {}
+
+        # Research-derived client background, surfaced FIRST (formerly its own
+        # "Owner Profile" section — consolidated here).
+        summary = data.get('owner_summary')
+        if summary and str(summary).strip() not in ('', 'Information not available'):
+            hdr = self.doc.add_paragraph()
+            hdr.add_run('Background (from research — verify in person):').bold = True
+            lines = [ln.strip().lstrip('•-').strip() for ln in str(summary).splitlines() if ln.strip()]
+            for ln in (lines if len(lines) > 1 else [str(summary).strip()]):
+                self.doc.add_paragraph(f"• {ln}")
 
         table = self.doc.add_table(rows=0, cols=2)
         table.style = 'Table Grid'
@@ -624,11 +637,15 @@ class DocumentGenerator:
             ('Name', names_str),
             ('Phone', client_info.get('phone') or 'N/A'),
             ('Email', client_info.get('email') or 'N/A'),
-            ('Profession', client_info.get('profession') or 'N/A'),
             ('Preferences', preferences_str),
             ('Constraints', constraints_str),
             ('Potential Concerns', red_flags_str)
         ]
+        # If the client stated a profession on the call, keep it (first-hand);
+        # otherwise the research-derived Background block above already covers it.
+        _stated_prof = client_info.get('profession')
+        if _stated_prof and str(_stated_prof).strip().lower() not in ('', 'n/a', 'none', 'information not available'):
+            details.insert(3, ('Profession (stated)', str(_stated_prof).strip()))
 
         for item, detail in details:
             row_cells = table.add_row().cells
@@ -1241,7 +1258,7 @@ class DocumentGenerator:
                 ('Property Details', self._add_property_details),
                 ('Site & Feasibility', self._add_site_feasibility),
                 ('Client Details', self._add_client_details),
-                ('Owner Profile', self._add_owner_profile),
+                # Owner Profile content is now folded into Client Details (top).
                 ('Property Links', self._add_property_links),
                 ('Building Requirements', self._add_building_requirements),
                 ('Renovation Scope', self._add_renovation_scope),
