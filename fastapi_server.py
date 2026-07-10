@@ -314,6 +314,19 @@ def process_transcript_and_generate_report(transcript_path: str, address: str = 
         if names:
             owner_name = str(names[0]).split('(')[0].strip() or None
 
+        # Strengthen the identity for owner research: the transcript often yields
+        # only a FIRST name, but the request's last_name comes from Zoho (the deal
+        # contact). If the transcript name is a single token and doesn't already
+        # include that surname, combine them into a fuller, more-verifiable name.
+        if last_name and str(last_name).strip():
+            ln = str(last_name).strip()
+            tokens = (owner_name or '').split()
+            if not owner_name:
+                owner_name = ln
+            elif len(tokens) < 2 and ln.lower() not in owner_name.lower():
+                owner_name = f"{tokens[0]} {ln}"
+            logger.info("Owner identity for research: %r (transcript + Zoho last_name)", owner_name)
+
         logger.info("Researching property + owner via web search for '%s' (may take a few minutes)...", address)
         research = property_research.research_property(
             address, config_obj.anthropic_api_key, owner_name=owner_name

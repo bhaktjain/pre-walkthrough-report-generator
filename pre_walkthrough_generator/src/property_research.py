@@ -41,7 +41,7 @@ _RESEARCH_SCHEMA = {
         "bedrooms", "bathrooms", "sqft", "year_built", "property_type",
         "lot_size", "last_sale_price", "last_sale_date", "assessed_value",
         "property_taxes", "zoning", "flood_zone", "neighborhood", "feasibility_notes",
-        "owner_summary", "sources",
+        "owner_summary", "photo_url", "sources",
     ],
     "properties": {
         "found": {"type": "boolean", "description": "true only if THIS specific property was identified in public records"},
@@ -68,6 +68,7 @@ _RESEARCH_SCHEMA = {
             "type": "string",
             "description": "Short labeled lines separated by newlines (Ownership / Tenure / Profession / Business-Employer / Other properties / For the meeting). PUBLIC professional and property-record context only — no personal, financial, family, or social-media details.",
         },
+        "photo_url": {"type": "string", "description": "a DIRECT image URL (ending .jpg/.jpeg/.png/.webp) of the property's main exterior/listing photo if publicly available, else 'Information not available'"},
         "sources": {"type": "array", "items": {"type": "string", "description": "source URL"}},
     },
 }
@@ -127,7 +128,10 @@ def _research_prompt(address: str, owner_name: Optional[str]) -> str:
         "  - FEMA flood zone\n"
         "  - renovation-relevant feasibility: municipal sewer vs. septic, any additions / permits / DOB "
         "records, landmark or historic-district status, and whether the lot/unit has room to build out "
-        "or reconfigure within the zoning/board envelope\n\n"
+        "or reconfigure within the zoning/board envelope\n"
+        "  - if a public listing shows a main exterior photo, capture its DIRECT image URL (ending "
+        ".jpg/.jpeg/.png/.webp) as photo_url; leave it 'Information not available' if none is clearly a "
+        "direct image link\n\n"
         "=== SOURCES ===\n"
         "Use authoritative PUBLIC sources and cross-check. For NYC: StreetEasy, PropertyShark, ACRIS "
         "(a836-acris.nyc.gov), NYC ZoLa (zola.planning.nyc.gov), DOB NOW / BIS, and NYC landmark maps. "
@@ -314,6 +318,7 @@ def research_property(
             "assessed_value": _field(data, "assessed_value"),
             "property_taxes": _field(data, "property_taxes"),
             "neighborhood": _field(data, "neighborhood"),
+            "photo_url": _field(data, "photo_url"),
             "photos": [],
             "floor_plans": [],
             "source": "public records research",

@@ -113,6 +113,19 @@ def _table_borders(table, color_hex: str, sz: str = '4') -> None:
     tblPr.append(borders)
 
 
+# Address classification (from property_research) — single source of truth for
+# the kind buckets so the various sections can't drift out of sync.
+_NOT_A_PARCEL_KINDS = ('not_a_parcel', 'no_parcel', 'none')
+_NON_RESIDENTIAL_KINDS = ('non_residential', 'nonresidential', 'commercial', 'mixed_use', 'land', 'institutional')
+
+
+def _address_kind(data: Dict[str, Any]):
+    """Return (resolves: bool, kind: str) with spaces/hyphens canonicalized."""
+    resolves = data.get('research_address_resolves', True)
+    kind = str(data.get('research_property_kind') or '').strip().lower().replace(' ', '_').replace('-', '_')
+    return resolves, kind
+
+
 class DocumentGenerator:
     def __init__(self):
         self.doc = Document()
@@ -407,13 +420,11 @@ class DocumentGenerator:
 
         property_info = data.get('property_details', {}) or {}
         address = data.get('property_address') or property_info.get('address') or 'this address'
-        resolves = data.get('research_address_resolves', True)
-        # Canonicalize spaces AND hyphens so "non-residential" matches the checks below.
-        kind = str(data.get('research_property_kind') or '').strip().lower().replace(' ', '_').replace('-', '_')
+        resolves, kind = _address_kind(data)
 
         # No specific parcel -> explain, instead of a table full of "Information
         # not available" that reads like a failure.
-        if resolves is False or kind in ('not_a_parcel', 'no_parcel', 'none'):
+        if resolves is False or kind in _NOT_A_PARCEL_KINDS:
             p = self.doc.add_paragraph()
             p.add_run(
                 f"No individual property record applies to “{address}” — it is a park, "
@@ -502,7 +513,7 @@ class DocumentGenerator:
 
         # Non-residential parcels (commercial / mixed-use / land / institutional)
         # don't have beds/baths/HOA — drop those rows rather than show blanks.
-        if kind in ('non_residential', 'nonresidential', 'commercial', 'mixed_use', 'land', 'institutional'):
+        if kind in _NON_RESIDENTIAL_KINDS:
             _drop = {'Bedrooms', 'Bathrooms', 'HOA Fee'}
             details = [(k, v) for (k, v) in details if k not in _drop]
 
@@ -523,6 +534,22 @@ class DocumentGenerator:
             )
             r.italic = True
             r.font.size = Pt(9)
+
+        # Best-effort: embed a public listing photo if the research found a direct
+        # image URL and it downloads. Listing CDNs often block hotlinking, so this
+        # degrades silently to no image (the Property Links section still links out).
+        photo = property_info.get('photo_url')
+        if photo and str(photo).strip() not in ('', 'Information not available') and str(photo).strip().startswith(('http://', 'https://')):
+            stream = self._download_image(str(photo).strip())
+            if stream:
+                try:
+                    self.doc.add_picture(stream, width=Inches(4.5))
+                    cap = self.doc.add_paragraph()
+                    rr = cap.add_run('Property photo (public listing)')
+                    rr.italic = True
+                    rr.font.size = Pt(8)
+                except Exception as e:
+                    logger.warning("Could not embed property photo: %s", e)
 
     def _download_image(self, url: str) -> Optional[BytesIO]:
         """Download an image and return it as a BytesIO (converted to PNG if needed)."""
@@ -622,7 +649,14 @@ class DocumentGenerator:
         paragraph._p.append(hyperlink)
 
     def _add_property_links(self, data: Dict[str, Any]):
-        """Add property links section"""
+        """Add property links + floor plan. These point at Realtor/Zillow, which
+        are residential-listing sites — so the whole section is skipped for a
+        park/area (not_a_parcel) or a non-residential parcel, where such links
+        are meaningless."""
+        resolves, kind = _address_kind(data)
+        if resolves is False or kind in _NOT_A_PARCEL_KINDS or kind in _NON_RESIDENTIAL_KINDS:
+            return
+
         self._heading('Property Links', level=1)
 
         property_details = data.get('property_details') or {}
