@@ -19,6 +19,7 @@ pipeline degrades gracefully.
 """
 import json
 import logging
+import time
 from typing import Any, Dict, Optional
 
 try:
@@ -36,13 +37,16 @@ _RESEARCH_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
     "required": [
-        "found", "bedrooms", "bathrooms", "sqft", "year_built", "property_type",
+        "found", "address_resolves", "property_kind",
+        "bedrooms", "bathrooms", "sqft", "year_built", "property_type",
         "lot_size", "last_sale_price", "last_sale_date", "assessed_value",
         "property_taxes", "zoning", "flood_zone", "neighborhood", "feasibility_notes",
         "owner_summary", "sources",
     ],
     "properties": {
         "found": {"type": "boolean", "description": "true only if THIS specific property was identified in public records"},
+        "address_resolves": {"type": "boolean", "description": "true if the address is a specific real parcel/building/unit with property records; false for a park, landmark, general area, or an address with no street number"},
+        "property_kind": {"type": "string", "enum": ["residential", "non_residential", "not_a_parcel", "unknown"], "description": "one of exactly: residential, non_residential, not_a_parcel, unknown"},
         "bedrooms": {"type": "string"},
         "bathrooms": {"type": "string"},
         "sqft": {"type": "string", "description": "living area square footage"},
@@ -80,9 +84,19 @@ def _research_prompt(address: str, owner_name: Optional[str]) -> str:
     )
     return (
         "You are preparing an internal pre-walkthrough research brief for a renovation contractor's "
-        "salesperson, who will meet the homeowner at the property. Be THOROUGH and specific — this brief "
-        "should let the rep walk in fully informed. Research the residential property at:\n\n"
+        "salesperson, who will meet the client at the property. Be THOROUGH and specific — this brief "
+        "should let the rep walk in fully informed. Research:\n\n"
         f"    {address}\n\n"
+        "=== FIRST: CLASSIFY THE ADDRESS ===\n"
+        "Decide what this address actually is and set two fields accordingly:\n"
+        "  - a specific home / condo / co-op unit -> address_resolves=true, property_kind='residential'\n"
+        "  - a specific commercial / mixed-use / institutional building -> address_resolves=true, property_kind='non_residential'\n"
+        "  - a PARK, landmark, open space, general area, or an address with NO street number (nothing to "
+        "look up as an individual parcel) -> address_resolves=false, property_kind='not_a_parcel'\n"
+        "  - genuinely unsure -> property_kind='unknown'\n"
+        "If not_a_parcel, do NOT invent parcel facts (beds/baths/sqft/owner): set those to 'Information "
+        "not available' and instead give useful AREA context in feasibility_notes (typical building "
+        "stock, zoning, historic-district risk, permit path).\n\n"
         "=== OBJECTIVE 1: THE PERSON (owner / first-call contact) ===\n"
         + person_line +
         "Then gather PUBLIC, professionally-relevant context to help the rep gauge project scope/budget "
@@ -125,6 +139,43 @@ def _research_prompt(address: str, owner_name: Optional[str]) -> str:
     )
 
 
+# Property-fact fields the gap-fill pass may backfill (owner/classification excluded).
+_PROPERTY_FACT_KEYS = (
+    "bedrooms", "bathrooms", "sqft", "year_built", "property_type", "lot_size",
+    "last_sale_price", "last_sale_date", "assessed_value", "property_taxes",
+    "zoning", "flood_zone", "neighborhood",
+)
+# Core facts worth a second targeted pass when the first leaves them blank.
+_CORE_FIELDS = ("bedrooms", "bathrooms", "sqft", "year_built")
+# Skip the (optional) gap-fill pass if pass 1 already consumed this much wall
+# clock, so pass1 + gap-fill stays well under the 600s gunicorn worker window
+# even on a slow-tail run.
+_GAPFILL_SKIP_AFTER = 240.0
+
+
+def _field(data: Optional[Dict[str, Any]], key: str) -> str:
+    """Read a research field, mapping missing/empty to the sentinel string."""
+    val = str((data or {}).get(key) or "").strip()
+    return val if val else "Information not available"
+
+
+def _gap_prompt(address: str, missing: list) -> str:
+    """Focused follow-up prompt for only the still-missing core property facts."""
+    labels = {
+        "bedrooms": "number of bedrooms", "bathrooms": "number of bathrooms",
+        "sqft": "interior living square footage", "year_built": "year built",
+    }
+    want = ", ".join(labels.get(m, m) for m in missing)
+    return (
+        f"Focused follow-up for the SPECIFIC property at:\n\n    {address}\n\n"
+        f"Find ONLY these still-missing facts: {want}.\n"
+        "Go straight to the authoritative parcel record — the county/city assessor or tax record. For "
+        "NYC search the BBL on PropertyShark / ACRIS / NYC DOF and use StreetEasy for a unit's "
+        "beds/baths/interior sqft. Report each fact with its source. If a fact truly cannot be found, "
+        "use 'Information not available' — do not guess."
+    )
+
+
 def research_property(
     address: str,
     anthropic_api_key: str,
@@ -145,8 +196,15 @@ def research_property(
     rather than a stuck worker. (Extended thinking + the dynamic-filtering tools
     are what previously pushed this to 15+ minutes; they stay off.)
 
-    Returns {property_details, feasibility, owner_summary, sources, found} or
-    None on any failure/timeout. Never raises.
+    First classifies the address (residential / non_residential / not_a_parcel)
+    so the report can adapt — a park or place-name yields no parcel facts by
+    design, not by failure. For a resolvable residential parcel still missing
+    core facts (beds/baths/sqft/year) after the first pass, runs one bounded
+    gap-fill pass and merges only the blanks.
+
+    Returns {found, address_resolves, property_kind, property_details,
+    feasibility, owner_summary, sources, zoning, flood_zone} or None on any
+    failure/timeout. Never raises.
     """
     if anthropic is None or not anthropic_api_key or not address:
         logger.info("Property research skipped (no SDK / key / address)")
@@ -155,63 +213,88 @@ def research_property(
         # Hard client-side timeout + no retries so one report can't hang for
         # tens of minutes on a slow search loop.
         client = anthropic.Anthropic(api_key=anthropic_api_key, timeout=timeout, max_retries=0)
+        _start = time.monotonic()
 
-        # Basic web search is much faster than the _20260209 (dynamic-filtering)
-        # variant. Page fetches are the slowest part, so they default off.
-        tools = [{"type": "web_search_20250305", "name": "web_search", "max_uses": max_searches}]
-        if max_fetches > 0:
-            tools.append({"type": "web_fetch_20250910", "name": "web_fetch", "max_uses": max_fetches})
-        create_kwargs = dict(
-            model=model, max_tokens=6000,
-            output_config={"effort": effort},
-            tools=tools,
-        )
-        if use_thinking:
-            create_kwargs["thinking"] = {"type": "adaptive"}
-        messages = [{"role": "user", "content": _research_prompt(address, owner_name)}]
-        response = None
-        for _ in range(4):  # allow a few pause_turn continuations for the deeper search/fetch rounds
-            response = client.messages.create(messages=messages, **create_kwargs)
-            if response.stop_reason == "pause_turn":
-                messages.append({"role": "assistant", "content": response.content})
-                continue
-            break
-        research_text = "".join(b.text for b in response.content if getattr(b, "type", None) == "text")
+        def _run_search(prompt: str, n_search: int, n_fetch: int) -> str:
+            """One research round: basic web search (+ optional fetch), following
+            pause_turn continuations. Basic tools (not the _20260209 dynamic-
+            filtering variant) keep it fast."""
+            tools = [{"type": "web_search_20250305", "name": "web_search", "max_uses": n_search}]
+            if n_fetch > 0:
+                tools.append({"type": "web_fetch_20250910", "name": "web_fetch", "max_uses": n_fetch})
+            kwargs = dict(model=model, max_tokens=6000, output_config={"effort": effort}, tools=tools)
+            if use_thinking:
+                kwargs["thinking"] = {"type": "adaptive"}
+            msgs = [{"role": "user", "content": prompt}]
+            resp = None
+            for _ in range(4):  # allow a few pause_turn continuations
+                resp = client.messages.create(messages=msgs, **kwargs)
+                if resp.stop_reason == "pause_turn":
+                    msgs.append({"role": "assistant", "content": resp.content})
+                    continue
+                break
+            return "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
+
+        def _structure(research_text: str) -> Optional[Dict[str, Any]]:
+            """Structure research prose into the schema; salvage wrapped JSON."""
+            struct = client.messages.create(
+                model=model, max_tokens=6000,  # headroom so the JSON isn't truncated
+                messages=[{"role": "user", "content": (
+                    "Extract the property research below into the required JSON. Use the exact string "
+                    "'Information not available' for any field the research did not establish. Do not "
+                    "invent values.\n\n--- RESEARCH ---\n" + research_text)}],
+                output_config={"effort": "low", "format": {"type": "json_schema", "schema": _RESEARCH_SCHEMA}},
+            )
+            raw = next((b.text for b in struct.content if getattr(b, "type", None) == "text"), "")
+            try:
+                return json.loads(raw)
+            except json.JSONDecodeError:
+                import re as _re
+                m = _re.search(r"\{.*\}", raw, _re.DOTALL)
+                return json.loads(m.group(0)) if m else None
+
+        # Pass 1: full research + structuring.
+        research_text = _run_search(_research_prompt(address, owner_name), max_searches, max_fetches)
         if not research_text.strip():
             logger.info("Property research produced no text for '%s'", address)
             return None
+        data = _structure(research_text)
+        if not data:
+            logger.warning("Property research structuring returned unparseable JSON for '%s'", address)
+            return None
 
-        # 2. Structure the findings (separate call — no tools, so output_config.format is clean).
-        struct = client.messages.create(
-            model=model, max_tokens=6000,  # ample headroom so the JSON isn't truncated
-            messages=[{
-                "role": "user",
-                "content": (
-                    "Extract the property research below into the required JSON. Use the exact string "
-                    "'Information not available' for any field the research did not establish. Do not "
-                    "invent values.\n\n--- RESEARCH ---\n" + research_text
-                ),
-            }],
-            output_config={"effort": "low", "format": {"type": "json_schema", "schema": _RESEARCH_SCHEMA}},
-        )
-        raw = next((b.text for b in struct.content if getattr(b, "type", None) == "text"), "")
-        try:
-            data = json.loads(raw)
-        except json.JSONDecodeError:
-            # Salvage a slow, already-successful research run whose structuring
-            # JSON came back wrapped in prose/markdown — grab the outermost {...}
-            # rather than discarding everything. Genuinely truncated JSON still
-            # fails here and degrades gracefully via the outer handler.
-            import re as _re
-            m = _re.search(r"\{.*\}", raw, _re.DOTALL)
-            if not m:
-                logger.warning("Property research structuring returned unparseable JSON for '%s'", address)
-                return None
-            data = json.loads(m.group(0))
+        address_resolves = bool(data.get("address_resolves", True))
+        # Canonicalize spaces AND hyphens ("non-residential" -> "non_residential")
+        # so a natural-orthography value still matches the renderer's checks.
+        property_kind = str(data.get("property_kind") or "unknown").strip().lower().replace(" ", "_").replace("-", "_")
 
-        def _v(key: str) -> str:
-            val = str(data.get(key) or "").strip()
-            return val if val else "Information not available"
+        # Pass 2 (gap-fill): only for a resolvable RESIDENTIAL parcel still missing
+        # core facts. Bounded (fewer searches, one fetch) so latency stays in
+        # budget; merges only blanks — never overwrites a pass-1 value.
+        if address_resolves and property_kind == "residential":
+            missing = [f for f in _CORE_FIELDS if _field(data, f) == "Information not available"]
+            elapsed = time.monotonic() - _start
+            if missing and elapsed > _GAPFILL_SKIP_AFTER:
+                logger.info("Skipping gap-fill for '%s' — pass 1 took %.0fs (>%.0fs), staying under the worker window",
+                            address, elapsed, _GAPFILL_SKIP_AFTER)
+                missing = []
+            if missing:
+                logger.info("Gap-fill pass for '%s' (missing: %s)", address, ", ".join(missing))
+                try:
+                    gap_text = _run_search(_gap_prompt(address, missing), 4, 1)
+                    gap = _structure(gap_text) if gap_text.strip() else None
+                    if gap:
+                        for k in _PROPERTY_FACT_KEYS:
+                            if _field(data, k) == "Information not available" and _field(gap, k) != "Information not available":
+                                data[k] = gap[k]
+                        merged, seen = [], set()
+                        for s in list(data.get("sources") or []) + list(gap.get("sources") or []):
+                            s = str(s).strip()
+                            if s and s not in seen:
+                                seen.add(s); merged.append(s)
+                        data["sources"] = merged
+                except Exception as e:
+                    logger.info("Gap-fill pass failed for '%s' (keeping pass-1 data): %s", address, e)
 
         property_details = {
             "address": address,
@@ -220,28 +303,30 @@ def research_property(
             # generator then renders the sale under a "Last Sold Price" label
             # instead of mislabeling a years-old purchase as the current price.
             "price": "Information not available",
-            "last_sold_price": _v("last_sale_price"),
-            "last_sold_date": _v("last_sale_date"),
-            "bedrooms": _v("bedrooms"),
-            "bathrooms": _v("bathrooms"),
-            "sqft": _v("sqft"),
-            "year_built": _v("year_built"),
-            "property_type": _v("property_type"),
-            "lot_size": _v("lot_size"),
-            "assessed_value": _v("assessed_value"),
-            "property_taxes": _v("property_taxes"),
-            "neighborhood": _v("neighborhood"),
+            "last_sold_price": _field(data, "last_sale_price"),
+            "last_sold_date": _field(data, "last_sale_date"),
+            "bedrooms": _field(data, "bedrooms"),
+            "bathrooms": _field(data, "bathrooms"),
+            "sqft": _field(data, "sqft"),
+            "year_built": _field(data, "year_built"),
+            "property_type": _field(data, "property_type"),
+            "lot_size": _field(data, "lot_size"),
+            "assessed_value": _field(data, "assessed_value"),
+            "property_taxes": _field(data, "property_taxes"),
+            "neighborhood": _field(data, "neighborhood"),
             "photos": [],
             "floor_plans": [],
             "source": "public records research",
         }
         return {
             "found": bool(data.get("found")),
+            "address_resolves": address_resolves,
+            "property_kind": property_kind,
             "property_details": property_details,
-            "zoning": _v("zoning"),
-            "flood_zone": _v("flood_zone"),
+            "zoning": _field(data, "zoning"),
+            "flood_zone": _field(data, "flood_zone"),
             "feasibility": [s for s in (data.get("feasibility_notes") or []) if str(s).strip()],
-            "owner_summary": _v("owner_summary"),
+            "owner_summary": _field(data, "owner_summary"),
             "sources": [s for s in (data.get("sources") or []) if str(s).strip()],
         }
     except Exception as e:  # never break the pipeline

@@ -295,6 +295,13 @@ def process_transcript_and_generate_report(transcript_path: str, address: str = 
                         address += ", Brooklyn, NY"
 
         logger.info(f"Using address: {address}")
+        # Flag up front when the address isn't a specific parcel (no leading street
+        # number — e.g. a park or place-name). Property records won't apply; the
+        # research classifies it and the report self-explains the empty details.
+        if address and not re.match(r'^\s*(?:apt\.?\s*\w+\s*,?\s*)?\d', address, re.IGNORECASE):
+            logger.warning("Address %r does not begin with a numeric street number — if it is a park, "
+                           "landmark, or general area (not an individual parcel), Property Details will "
+                           "be limited (the research classifies this and the report self-explains).", address)
 
         # --- Property + owner research via Claude web search (PRIMARY source) ---
         # Realtor/SerpAPI only cover ON-market listings, so owned homes (the
@@ -365,6 +372,8 @@ def process_transcript_and_generate_report(transcript_path: str, address: str = 
             "research_feasibility": research.get("feasibility") or [],
             "research_sources": research.get("sources") or [],
             "owner_summary": research.get("owner_summary"),
+            "research_address_resolves": research.get("address_resolves", True),
+            "research_property_kind": research.get("property_kind"),
             "zoho_notes": zoho_notes,
         }
 

@@ -399,14 +399,34 @@ class DocumentGenerator:
             para.paragraph_format.space_after = Pt(6)
 
     def _add_property_details(self, data: Dict[str, Any]):
-        """Add property details section"""
+        """Add the Property Details section, adapted to what the address is:
+        a park/landmark/area (no parcel) gets an explanatory note; a
+        non-residential parcel drops beds/baths/HOA; a residential parcel gets
+        the full table (with a note if no record was found at all)."""
         self._heading('Property Details', level=1)
+
+        property_info = data.get('property_details', {}) or {}
+        address = data.get('property_address') or property_info.get('address') or 'this address'
+        resolves = data.get('research_address_resolves', True)
+        # Canonicalize spaces AND hyphens so "non-residential" matches the checks below.
+        kind = str(data.get('research_property_kind') or '').strip().lower().replace(' ', '_').replace('-', '_')
+
+        # No specific parcel -> explain, instead of a table full of "Information
+        # not available" that reads like a failure.
+        if resolves is False or kind in ('not_a_parcel', 'no_parcel', 'none'):
+            p = self.doc.add_paragraph()
+            p.add_run(
+                f"No individual property record applies to “{address}” — it is a park, "
+                "landmark, general area, or has no specific street number, so there is no parcel-level "
+                "data (beds, baths, square footage, owner of record). For full property details, generate "
+                "with a specific street address (house number + street). See Site & Feasibility below for "
+                "area context."
+            )
+            return
 
         table = self.doc.add_table(rows=0, cols=2)
         table.style = 'Table Grid'
         table.autofit = True
-
-        property_info = data.get('property_details', {}) or {}
 
         # Price (fallback to last sold price)
         price_num = _leading_money(property_info.get('price'))
@@ -480,10 +500,29 @@ class DocumentGenerator:
             ('Neighborhood', neighborhood)
         ]
 
+        # Non-residential parcels (commercial / mixed-use / land / institutional)
+        # don't have beds/baths/HOA — drop those rows rather than show blanks.
+        if kind in ('non_residential', 'nonresidential', 'commercial', 'mixed_use', 'land', 'institutional'):
+            _drop = {'Bedrooms', 'Bathrooms', 'HOA Fee'}
+            details = [(k, v) for (k, v) in details if k not in _drop]
+
         for item, detail in details:
             row_cells = table.add_row().cells
             row_cells[0].text = item
             row_cells[1].text = str(detail)
+
+        # A real address that returned no record at all: say so, rather than
+        # leaving a wall of "Information not available" that reads like a bug.
+        _blank = ('', 'information not available', 'contact broker for pricing', 'n/a')
+        if all(str(v).strip().lower() in _blank for _, v in details):
+            note = self.doc.add_paragraph()
+            r = note.add_run(
+                "No public property record was found for this specific address — it may be new "
+                "construction, recently re-parceled, or not yet in public databases. The scope and site "
+                "notes below are based on the consultation."
+            )
+            r.italic = True
+            r.font.size = Pt(9)
 
     def _download_image(self, url: str) -> Optional[BytesIO]:
         """Download an image and return it as a BytesIO (converted to PNG if needed)."""
