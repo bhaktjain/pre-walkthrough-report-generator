@@ -327,9 +327,17 @@ def process_transcript_and_generate_report(transcript_path: str, address: str = 
                 owner_name = f"{tokens[0]} {ln}"
             logger.info("Owner identity for research: %r (transcript + Zoho last_name)", owner_name)
 
+        # Client-provided contact details (from the consultation) help the research
+        # confirm WHICH public professional profile is the right person for a common
+        # name — used only to pin professional identity, not for personal profiling.
+        _ci = transcript_info.get('client_info') or {}
+        owner_email = (_ci.get('email') or '').strip() or None
+        owner_phone = (_ci.get('phone') or '').strip() or None
+
         logger.info("Researching property + owner via web search for '%s' (may take a few minutes)...", address)
         research = property_research.research_property(
-            address, config_obj.anthropic_api_key, owner_name=owner_name
+            address, config_obj.anthropic_api_key, owner_name=owner_name,
+            owner_email=owner_email, owner_phone=owner_phone,
         ) or {}
         property_details = research.get("property_details") or {}
         if not property_details:

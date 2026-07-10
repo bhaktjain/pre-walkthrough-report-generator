@@ -76,15 +76,36 @@ _RESEARCH_SCHEMA = {
 }
 
 
-def _research_prompt(address: str, owner_name: Optional[str]) -> str:
+def _research_prompt(address: str, owner_name: Optional[str],
+                     owner_email: Optional[str] = None, owner_phone: Optional[str] = None) -> str:
     person = owner_name.strip() if owner_name else None
+    # Client-provided contact details (from the consultation) — used ONLY to
+    # confirm WHICH public professional profile is the right person when the name
+    # is common. Not for personal-life profiling.
+    contacts = []
+    if owner_email and str(owner_email).strip():
+        contacts.append(f"email {str(owner_email).strip()}")
+    if owner_phone and str(owner_phone).strip():
+        contacts.append(f"phone {str(owner_phone).strip()}")
+    contact_line = (
+        "  - DISAMBIGUATE a common name: pull the ACRIS/county DEED for the exact legal owner name "
+        "(with middle initial or LLC/trust if any). The client gave these contact details on the call — "
+        "use them to CONFIRM which specific public professional profile is this person (e.g. the same "
+        f"{' or '.join(contacts)} appearing on a company page, professional bio, or profile): "
+        f"{', '.join(contacts)}. Use them ONLY to pin the correct professional identity — never to "
+        "compile personal-life information. If it still can't be uniquely confirmed, list the candidate "
+        "profiles and say 'verify in person'.\n"
+        if contacts else
+        "  - DISAMBIGUATE a common name using the ACRIS/county DEED for the exact legal owner name; if "
+        "still ambiguous, list the candidate profiles and say 'verify in person'.\n"
+    )
     person_line = (
         f"The salesperson's walkthrough is with: {person}. Treat this person as the primary subject. "
         f"First confirm whether {person} is the current owner of record from the public deed/tax record; "
         f"if the record shows a different owner, report BOTH and flag the mismatch.\n"
         if person else
         "Identify the current owner of record from the public deed/tax record.\n"
-    )
+    ) + contact_line
     return (
         "You are preparing an internal pre-walkthrough research brief for a renovation contractor's "
         "salesperson, who will meet the client at the property. Be THOROUGH and specific — this brief "
@@ -134,14 +155,16 @@ def _research_prompt(address: str, owner_name: Optional[str]) -> str:
         "  - if a public listing shows a main exterior photo, capture its DIRECT image URL (ending "
         ".jpg/.jpeg/.png/.webp) as photo_url; leave it 'Information not available' if none is clearly a "
         "direct image link\n"
-        "  - FLOOR PLAN (high priority): actively hunt for one. Check the property's CURRENT and PAST "
-        "listings on StreetEasy, Zillow, Realtor.com, and CityRealty, and for a condo/co-op the "
-        "building's line/stack floor plans. Once you find the listing page, FETCH IT and look "
-        "specifically for a floor-plan image — on StreetEasy/CityRealty/Zillow these are hosted on their "
-        "image CDNs (e.g. photos.zillowstatic.com, i.arch.stdibs, streeteasy image hosts) and the HTML "
-        "usually contains a direct .jpg/.png/.webp URL, sometimes near the text 'floor plan'. Return that "
-        "direct image URL as floor_plan_url. ALWAYS return the best listing page URL as listing_url (a "
-        "place the rep can open to see the floor plan and photos). Try hard before giving up.\n\n"
+        "  - FLOOR PLAN (high priority): actively hunt for one. A floor plan is a TOP-DOWN SCHEMATIC "
+        "LINE DRAWING of the unit layout (rooms, walls, dimensions) — it is NOT a photograph of a room. "
+        "Check the property's CURRENT and PAST listings on StreetEasy, Zillow, Realtor.com, and "
+        "CityRealty, and for a condo/co-op the building's line/stack floor plans. Once you find the "
+        "listing page, FETCH IT and look specifically for the floor-plan diagram image (often labeled "
+        "'floor plan' and visually a schematic, not a photo). Return that direct image URL as "
+        "floor_plan_url. Do NOT return a room/interior/exterior PHOTO as floor_plan_url — if you cannot "
+        "find an actual floor-plan diagram, set floor_plan_url to 'Information not available' (a photo "
+        "does not count). ALWAYS return the best listing page URL as listing_url (where the rep can open "
+        "the floor plan and photos).\n\n"
         "=== SOURCES ===\n"
         "Use authoritative PUBLIC sources and cross-check. For NYC: StreetEasy, PropertyShark, ACRIS "
         "(a836-acris.nyc.gov), NYC ZoLa (zola.planning.nyc.gov), DOB NOW / BIS, and NYC landmark maps. "
@@ -198,6 +221,8 @@ def research_property(
     address: str,
     anthropic_api_key: str,
     owner_name: Optional[str] = None,
+    owner_email: Optional[str] = None,
+    owner_phone: Optional[str] = None,
     model: str = DEFAULT_MODEL,
     effort: str = "low",
     max_searches: int = 8,
@@ -271,8 +296,29 @@ def research_property(
                 m = _re.search(r"\{.*\}", raw, _re.DOTALL)
                 return json.loads(m.group(0)) if m else None
 
+        def _looks_like_floor_plan(url: str) -> bool:
+            """Vision-verify a candidate floor_plan_url is an actual schematic, not
+            a room photo the model mislabeled. Conservative: any error/uncertainty
+            counts as NOT a floor plan (better a link than a wrong image)."""
+            try:
+                v = client.messages.create(
+                    model="claude-haiku-4-5", max_tokens=10,
+                    messages=[{"role": "user", "content": [
+                        {"type": "image", "source": {"type": "url", "url": url}},
+                        {"type": "text", "text": "Is this image an architectural FLOOR PLAN (a top-down "
+                         "schematic diagram of a room layout with walls/room labels), or a PHOTO / "
+                         "something else? Answer with exactly one word: FLOORPLAN or OTHER."}]}],
+                )
+                ans = "".join(b.text for b in v.content if getattr(b, "type", None) == "text").strip().upper()
+                return ans.startswith("FLOORPLAN")
+            except Exception as e:
+                logger.info("Floor-plan vision check failed for %s (%s) — treating as not a floor plan",
+                            url, type(e).__name__)
+                return False
+
         # Pass 1: full research + structuring.
-        research_text = _run_search(_research_prompt(address, owner_name), max_searches, max_fetches)
+        research_text = _run_search(_research_prompt(address, owner_name, owner_email, owner_phone),
+                                    max_searches, max_fetches)
         if not research_text.strip():
             logger.info("Property research produced no text for '%s'", address)
             return None
@@ -313,6 +359,13 @@ def research_property(
                         data["sources"] = merged
                 except Exception as e:
                     logger.info("Gap-fill pass failed for '%s' (keeping pass-1 data): %s", address, e)
+
+        # Reject a mislabeled photo passed off as a floor plan (vision check).
+        fp = _field(data, "floor_plan_url")
+        if fp != "Information not available" and str(fp).startswith(("http://", "https://")):
+            if not _looks_like_floor_plan(str(fp)):
+                logger.info("Rejected non-floor-plan image as floor_plan_url for '%s': %s", address, fp)
+                data["floor_plan_url"] = "Information not available"
 
         property_details = {
             "address": address,
