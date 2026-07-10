@@ -556,21 +556,8 @@ class DocumentGenerator:
             r.italic = True
             r.font.size = Pt(9)
 
-        # Best-effort: embed a public listing photo if the research found a direct
-        # image URL and it downloads. Listing CDNs often block hotlinking, so this
-        # degrades silently to no image (the Property Links section still links out).
-        photo = property_info.get('photo_url')
-        if photo and str(photo).strip() not in ('', 'Information not available') and str(photo).strip().startswith(('http://', 'https://')):
-            stream = self._download_image(str(photo).strip())
-            if stream:
-                try:
-                    self.doc.add_picture(stream, width=Inches(4.5))
-                    cap = self.doc.add_paragraph()
-                    rr = cap.add_run('Property photo (public listing)')
-                    rr.italic = True
-                    rr.font.size = Pt(8)
-                except Exception as e:
-                    logger.warning("Could not embed property photo: %s", e)
+        # Property photo embed removed per request. (The research still captures
+        # photo_url; re-enable by restoring the embed here if wanted later.)
 
     def _download_image(self, url: str) -> Optional[BytesIO]:
         """Download an image, downscale + re-encode as JPEG so an embedded photo or
