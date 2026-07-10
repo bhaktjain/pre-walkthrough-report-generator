@@ -406,7 +406,10 @@ def process_transcript_and_generate_report(transcript_path: str, address: str = 
         else:
             file_name = f"PreWalk_{safe_addr}.docx"
         
-        output_path = doc_generator.generate_report(final_data, file_name=file_name)
+        # Report output dir is env-configurable so it can point at a mounted
+        # persistent disk (with REPORT_JOBS_DIR) for durability across redeploys.
+        output_dir = os.environ.get("REPORT_OUTPUT_DIR") or "data"
+        output_path = doc_generator.generate_report(final_data, output_dir=output_dir, file_name=file_name)
         
         if not output_path:
             raise Exception("Failed to generate report")
@@ -598,11 +601,62 @@ async def generate_report_from_text(request: TranscriptRequest):
 _report_jobs: dict = {}
 _REPORT_JOB_TTL = 3600   # seconds a finished job (and its .docx) is retained
 _REPORT_JOB_MAX = 200    # hard cap on retained jobs
+# A finished job's metadata is also written to disk so a report that COMPLETED
+# survives a worker recycle: report_status recovers it after the in-memory store
+# is lost, instead of 404-ing. (A full container redeploy still wipes ephemeral
+# disk — point REPORT_JOBS_DIR at a mounted persistent disk to survive deploys.)
+_JOBS_META_DIR = os.environ.get("REPORT_JOBS_DIR") or os.path.join(tempfile.gettempdir(), "prewalk_jobs")
+
+
+def _valid_job_id(job_id: str) -> bool:
+    """job_id is a uuid4 hex — reject anything else before it touches the fs."""
+    return bool(re.fullmatch(r'[0-9a-fA-F]{32}', job_id or ''))
+
+
+def _job_meta_path(job_id: str) -> str:
+    return os.path.join(_JOBS_META_DIR, f"{job_id}.json")
+
+
+def _persist_job(job_id: str, rec: dict) -> None:
+    """Write a finished job's metadata to disk (best-effort, atomic replace)."""
+    try:
+        os.makedirs(_JOBS_META_DIR, exist_ok=True)
+        tmp = _job_meta_path(job_id) + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(rec, f)
+        os.replace(tmp, _job_meta_path(job_id))
+    except Exception as e:
+        logger.warning("Could not persist job %s metadata: %s", job_id, e)
+
+
+def _load_job(job_id: str) -> Optional[dict]:
+    """Recover a finished job's metadata from disk after an in-memory miss."""
+    if not _valid_job_id(job_id):
+        return None
+    try:
+        with open(_job_meta_path(job_id)) as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def _remove_job_files(path: Optional[str], job_id: str) -> None:
+    """Delete a finished job's report .docx and its on-disk metadata sidecar."""
+    targets = [path]
+    if _valid_job_id(job_id):
+        targets.append(_job_meta_path(job_id))
+    for p in targets:
+        if p and os.path.exists(p):
+            try:
+                os.unlink(p)
+            except Exception:
+                pass
 
 
 def _prune_report_jobs() -> None:
-    """Evict finished jobs (deleting their .docx) past the TTL or beyond the cap,
-    so the long-lived single worker doesn't leak memory and disk."""
+    """Evict finished jobs (deleting their .docx + metadata sidecar) past the TTL
+    or beyond the cap, so the long-lived worker doesn't leak memory/disk. Also
+    sweeps orphaned on-disk sidecars left by a previous worker."""
     try:
         now = time.time()
         finished = [(jid, j) for jid, j in _report_jobs.items() if j.get("status") in ("done", "error")]
@@ -614,12 +668,21 @@ def _prune_report_jobs() -> None:
                 stale.add(jid)
         for jid in stale:
             j = _report_jobs.pop(jid, None)
-            path = (j or {}).get("path")
-            if path and os.path.exists(path):
-                try:
-                    os.unlink(path)
-                except Exception:
-                    pass
+            _remove_job_files((j or {}).get("path"), jid)
+        # Sweep on-disk sidecars past the TTL (orphans from a prior worker whose
+        # in-memory store is gone), so persisted jobs don't accumulate forever.
+        try:
+            for fn in os.listdir(_JOBS_META_DIR):
+                if not fn.endswith(".json"):
+                    continue
+                jid = fn[:-5]
+                if jid in _report_jobs:
+                    continue
+                rec = _load_job(jid) or {}
+                if now - float(rec.get("ts", 0) or 0) > _REPORT_JOB_TTL:
+                    _remove_job_files(rec.get("path"), jid)
+        except FileNotFoundError:
+            pass
     except Exception as e:
         logger.warning("Report-job prune failed: %s", e)
 
@@ -637,10 +700,12 @@ def _run_report_job(job_id: str, flattened: str, address: Optional[str], last_na
         if temp_file_path and os.path.exists(temp_file_path):
             os.unlink(temp_file_path)
         if not report_path or not os.path.exists(report_path):
-            _report_jobs[job_id] = {"status": "error", "error": "Failed to generate report", "ts": time.time()}
+            rec = {"status": "error", "error": "Failed to generate report", "ts": time.time()}
         else:
-            _report_jobs[job_id] = {"status": "done", "path": report_path, "last_name": last_name, "ts": time.time()}
+            rec = {"status": "done", "path": report_path, "last_name": last_name, "ts": time.time()}
             logger.info("Async report job %s complete: %s", job_id, report_path)
+        _report_jobs[job_id] = rec
+        _persist_job(job_id, rec)  # survive a worker recycle
     except Exception as e:
         if temp_file_path and os.path.exists(temp_file_path):
             try:
@@ -648,7 +713,9 @@ def _run_report_job(job_id: str, flattened: str, address: Optional[str], last_na
             except Exception:
                 pass
         logger.error("Async report job %s failed: %s", job_id, e)
-        _report_jobs[job_id] = {"status": "error", "error": str(e), "ts": time.time()}
+        rec = {"status": "error", "error": str(e), "ts": time.time()}
+        _report_jobs[job_id] = rec
+        _persist_job(job_id, rec)
 
 
 def _absolute_base_url(http_request: Request) -> str:
@@ -699,6 +766,11 @@ async def generate_report_from_text_async(request: TranscriptRequest, http_reque
 async def report_status(job_id: str, http_request: Request):
     """Poll target for an async report: 202 while running, 200 with the .docx when done."""
     job = _report_jobs.get(job_id)
+    if job is None:
+        # In-memory miss — recover a COMPLETED job from its disk sidecar (survives
+        # a worker recycle). A job that was still running when the worker died is
+        # unrecoverable (its thread is gone), so it correctly stays a 404.
+        job = _load_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Unknown or expired job id")
     if job["status"] == "running":
