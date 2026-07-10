@@ -41,7 +41,7 @@ _RESEARCH_SCHEMA = {
         "bedrooms", "bathrooms", "sqft", "year_built", "property_type",
         "lot_size", "last_sale_price", "last_sale_date", "assessed_value",
         "property_taxes", "zoning", "flood_zone", "neighborhood", "feasibility_notes",
-        "owner_summary", "photo_url", "sources",
+        "owner_summary", "photo_url", "floor_plan_url", "listing_url", "sources",
     ],
     "properties": {
         "found": {"type": "boolean", "description": "true only if THIS specific property was identified in public records"},
@@ -69,6 +69,8 @@ _RESEARCH_SCHEMA = {
             "description": "Short labeled lines separated by newlines (Ownership / Tenure / Profession / Business-Employer / Other properties / For the meeting). PUBLIC professional and property-record context only — no personal, financial, family, or social-media details.",
         },
         "photo_url": {"type": "string", "description": "a DIRECT image URL (ending .jpg/.jpeg/.png/.webp) of the property's main exterior/listing photo if publicly available, else 'Information not available'"},
+        "floor_plan_url": {"type": "string", "description": "a DIRECT image URL (ending .jpg/.jpeg/.png/.webp/.gif) of a FLOOR PLAN for this specific home/unit if publicly available (current or past StreetEasy/Zillow/Realtor listing, or a condo/co-op line/stack plan), else 'Information not available'"},
+        "listing_url": {"type": "string", "description": "the URL of the property's most relevant current or past public listing page (StreetEasy/Zillow/Realtor), a good place to find the floor plan and photos, else 'Information not available'"},
         "sources": {"type": "array", "items": {"type": "string", "description": "source URL"}},
     },
 }
@@ -131,13 +133,25 @@ def _research_prompt(address: str, owner_name: Optional[str]) -> str:
         "or reconfigure within the zoning/board envelope\n"
         "  - if a public listing shows a main exterior photo, capture its DIRECT image URL (ending "
         ".jpg/.jpeg/.png/.webp) as photo_url; leave it 'Information not available' if none is clearly a "
-        "direct image link\n\n"
+        "direct image link\n"
+        "  - FLOOR PLAN (high priority): actively hunt for one. Check the property's CURRENT and PAST "
+        "listings on StreetEasy, Zillow, Realtor.com, and CityRealty, and for a condo/co-op the "
+        "building's line/stack floor plans. Once you find the listing page, FETCH IT and look "
+        "specifically for a floor-plan image — on StreetEasy/CityRealty/Zillow these are hosted on their "
+        "image CDNs (e.g. photos.zillowstatic.com, i.arch.stdibs, streeteasy image hosts) and the HTML "
+        "usually contains a direct .jpg/.png/.webp URL, sometimes near the text 'floor plan'. Return that "
+        "direct image URL as floor_plan_url. ALWAYS return the best listing page URL as listing_url (a "
+        "place the rep can open to see the floor plan and photos). Try hard before giving up.\n\n"
         "=== SOURCES ===\n"
         "Use authoritative PUBLIC sources and cross-check. For NYC: StreetEasy, PropertyShark, ACRIS "
         "(a836-acris.nyc.gov), NYC ZoLa (zola.planning.nyc.gov), DOB NOW / BIS, and NYC landmark maps. "
         "For NJ: njpropertyrecords, njparcels, and the county tax assessor. For CT/other: the county or "
         "town assessor (e.g. vgsi) and GIS. Everywhere: Zillow/Redfin/Realtor listing history, and FEMA "
         "msc.fema.gov for flood. Prefer the county/assessor record for facts.\n\n"
+        "\n=== GOAL ===\n"
+        "The salesperson should NOT have to research anything again before the walkthrough. Be "
+        "exhaustive on building/unit details, and do your best to capture the floor plan, a photo, and "
+        "the listing URL if they exist publicly.\n\n"
         "Be factual and cite your sources. If a specific fact cannot be found, use the exact phrase "
         "'Information not available' for it rather than guessing."
     )
@@ -187,7 +201,7 @@ def research_property(
     model: str = DEFAULT_MODEL,
     effort: str = "low",
     max_searches: int = 8,
-    max_fetches: int = 2,
+    max_fetches: int = 3,   # room to fetch a listing page for the floor plan/photo
     use_thinking: bool = False,
     timeout: float = 420.0,
 ) -> Optional[Dict[str, Any]]:
@@ -319,6 +333,8 @@ def research_property(
             "property_taxes": _field(data, "property_taxes"),
             "neighborhood": _field(data, "neighborhood"),
             "photo_url": _field(data, "photo_url"),
+            "floor_plan_url": _field(data, "floor_plan_url"),
+            "listing_url": _field(data, "listing_url"),
             "photos": [],
             "floor_plans": [],
             "source": "public records research",

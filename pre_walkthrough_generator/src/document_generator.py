@@ -190,6 +190,27 @@ class DocumentGenerator:
         return "https://www.zillow.com/homes/" + quote(str(address).strip()) + "_rb/"
 
     @staticmethod
+    def _realtor_search_url(address) -> Optional[str]:
+        """A Realtor.com search URL for an address — the listing page (current or
+        historical) is a common source of floor plans."""
+        if not address:
+            return None
+        from urllib.parse import quote
+        return "https://www.realtor.com/realestateandhomes-search/" + quote(str(address).strip().replace(' ', '-'))
+
+    @staticmethod
+    def _streeteasy_search_url(address) -> Optional[str]:
+        """A StreetEasy search URL (NYC) — the best floor-plan source for NYC
+        condos/co-ops. Returns None for clearly non-NYC addresses."""
+        if not address:
+            return None
+        a = str(address).lower()
+        if not any(t in a for t in (' ny', ',ny', 'new york', 'brooklyn', 'manhattan', 'queens', 'bronx', 'staten')):
+            return None
+        from urllib.parse import quote
+        return "https://streeteasy.com/search?utf8=%E2%9C%93&q=" + quote(str(address).strip())
+
+    @staticmethod
     def _is_meaningful(value) -> bool:
         """True if a value carries real content.
 
@@ -661,6 +682,14 @@ class DocumentGenerator:
 
         property_details = data.get('property_details') or {}
 
+        # The research's own listing_url is the most accurate link (the exact page
+        # it found) — surface it first when present.
+        listing_url = property_details.get('listing_url')
+        if listing_url and str(listing_url).strip() not in ('', 'Information not available') and str(listing_url).strip().startswith(('http://', 'https://')):
+            lp = self.doc.add_paragraph()
+            lp.add_run('• Listing found: ').bold = True
+            self._add_hyperlink(lp, 'Open listing', str(listing_url).strip())
+
         realtor_url = data.get('realtor_url')
         if not realtor_url:
             pid = data.get('property_id')
@@ -690,40 +719,63 @@ class DocumentGenerator:
             zpara.add_run('• Zillow: ').bold = True
             self._add_hyperlink(zpara, 'View Listing', zillow_url)
 
-        # Floor Plan section
+        # Floor Plan — try hardest to hand the rep an actual plan so they never
+        # have to hunt for it: (1) a floor-plan image the research found, embedded;
+        # (2) any legacy floor_plans entries; (3) direct links to every listing
+        # site that commonly carries floor plans (Realtor, Zillow, StreetEasy-NYC).
         self._heading('Floor Plan', level=2)
+        address = data.get('property_address')
+        fp_url = property_details.get('floor_plan_url')
         floor_plans_data = data.get('floor_plans') or {}
         floor_plans = floor_plans_data.get('floor_plans', []) or property_details.get('floor_plans', [])
+        embedded = False
 
-        if not floor_plans:
-            zillow_url = data.get('zillow_url') or self._zillow_search_url(data.get('property_address'))
-            if zillow_url:
-                fp = self.doc.add_paragraph()
-                fp.add_run('No floor plan from Realtor. Check the Zillow listing (often includes a floor plan): ')
-                self._add_hyperlink(fp, 'View on Zillow', zillow_url)
-            else:
-                self.doc.add_paragraph('No floor plans available.')
-            return
-
-        for plan in floor_plans:
-            url = plan.get('url') if isinstance(plan, dict) else None
-            if not url:
-                continue
-            image_stream = self._download_image(url)
-            if image_stream:
+        # (1) research-provided floor-plan image
+        if fp_url and str(fp_url).strip() not in ('', 'Information not available') and str(fp_url).strip().startswith(('http://', 'https://')):
+            stream = self._download_image(str(fp_url).strip())
+            if stream:
                 try:
-                    self.doc.add_picture(image_stream, width=Inches(6.0))
-                    link_para = self.doc.add_paragraph()
-                    link_para.add_run('Floor plan link: ').bold = True
-                    self._add_hyperlink(link_para, url, url)
-                    self.doc.add_paragraph()
-                    continue
+                    self.doc.add_picture(stream, width=Inches(6.0))
+                    lp = self.doc.add_paragraph()
+                    lp.add_run('Floor plan source: ').bold = True
+                    self._add_hyperlink(lp, str(fp_url).strip(), str(fp_url).strip())
+                    embedded = True
                 except Exception as e:
-                    logger.error("Exception embedding floor-plan image %s: %s", url, e)
-            # Could not download/embed — link out instead.
-            link_para = self.doc.add_paragraph()
-            link_para.add_run('Floor plan link: ').bold = True
-            self._add_hyperlink(link_para, url, url)
+                    logger.warning("Could not embed floor-plan image %s: %s", fp_url, e)
+
+        # (2) legacy floor_plans list
+        if not embedded:
+            for plan in floor_plans:
+                url = plan.get('url') if isinstance(plan, dict) else None
+                if not url:
+                    continue
+                stream = self._download_image(url)
+                if stream:
+                    try:
+                        self.doc.add_picture(stream, width=Inches(6.0))
+                        lp = self.doc.add_paragraph()
+                        lp.add_run('Floor plan link: ').bold = True
+                        self._add_hyperlink(lp, url, url)
+                        embedded = True
+                        continue
+                    except Exception as e:
+                        logger.error("Exception embedding floor-plan image %s: %s", url, e)
+                lp = self.doc.add_paragraph()
+                lp.add_run('Floor plan link: ').bold = True
+                self._add_hyperlink(lp, url, url)
+                embedded = True
+
+        # (3) no image retrievable — point the rep at the listing sites that carry
+        # floor plans (this is the "get it from Realtor" fallback).
+        if not embedded:
+            self.doc.add_paragraph('No floor-plan image was retrievable. Check the listing pages below — they often include a floor plan:')
+            for name, url in (('Realtor.com', realtor_url or self._realtor_search_url(address)),
+                              ('Zillow', data.get('zillow_url') or self._zillow_search_url(address)),
+                              ('StreetEasy', self._streeteasy_search_url(address))):
+                if url:
+                    fp = self.doc.add_paragraph()
+                    fp.add_run(f'• {name}: ').bold = True
+                    self._add_hyperlink(fp, 'Open listing', url)
 
     def _add_section_break(self):
         """Add a section break for clarity"""
