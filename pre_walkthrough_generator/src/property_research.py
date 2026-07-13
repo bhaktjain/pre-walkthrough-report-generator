@@ -255,7 +255,10 @@ def research_property(
     model: str = DEFAULT_MODEL,
     effort: str = "low",
     max_searches: int = 8,
-    max_fetches: int = 3,   # room to fetch a listing page for the floor plan/photo
+    max_fetches: int = 1,   # page fetches are the slow part; beds/baths come from
+                            # search SNIPPETS, so keep fetches minimal to stay well
+                            # under Power Automate's ~120s HTTP window
+
     use_thinking: bool = False,
     timeout: float = 420.0,
 ) -> Optional[Dict[str, Any]]:
@@ -374,7 +377,7 @@ def research_property(
             if missing:
                 logger.info("Gap-fill pass for '%s' (missing: %s)", address, ", ".join(missing))
                 try:
-                    gap_text = _run_search(_gap_prompt(address, missing), 5, 2)  # room to fetch a listing page
+                    gap_text = _run_search(_gap_prompt(address, missing), 5, 1)  # snippets over fetches (keep it fast)
                     gap = _structure(gap_text) if gap_text.strip() else None
                     if gap:
                         for k in _PROPERTY_FACT_KEYS:
