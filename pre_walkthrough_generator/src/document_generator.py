@@ -480,7 +480,14 @@ class DocumentGenerator:
             price_label, price_display = 'Current Price', str(property_info.get('price'))
         elif last_sold_num is not None:
             price_label = 'Last Sold Price'
-            price_display = f"${last_sold_num:,.2f} ({last_sold_date})" if _has_date else f"${last_sold_num:,.2f}"
+            # If the research flagged the sale as below-market / non-arm's-length,
+            # keep its caveat text verbatim instead of reducing to a bare number
+            # (a $164K deed on a ~$770K unit must not read as the value).
+            _raw = str(last_sold_price or '')
+            if any(w in _raw.lower() for w in ('below-market', 'below market', "arm", 'transfer', 'nominal', 'intra')):
+                price_display = f"{_raw} ({last_sold_date})" if _has_date and str(last_sold_date) not in _raw else _raw
+            else:
+                price_display = f"${last_sold_num:,.2f} ({last_sold_date})" if _has_date else f"${last_sold_num:,.2f}"
         elif last_sold_price not in (None, '', 'Information not available'):
             price_label = 'Last Sold Price'
             price_display = f"{last_sold_price} ({last_sold_date})" if _has_date else str(last_sold_price)
