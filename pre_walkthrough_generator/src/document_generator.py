@@ -388,7 +388,8 @@ class DocumentGenerator:
         elif tr_min is not None or tr_max is not None:
             lo = tr_min if tr_min is not None else tr_max
             hi = tr_max if tr_max is not None else tr_min
-            budget_phrase = f"Budget {self._format_currency(lo)} – {self._format_currency(hi)}"
+            budget_phrase = (f"Budget {self._format_currency(lo)}" if lo == hi
+                             else f"Budget {self._format_currency(lo)} – {self._format_currency(hi)}")
         else:
             # Sum up component costs as a fallback estimate.
             min_total, max_total = 0.0, 0.0
@@ -1045,7 +1046,10 @@ class DocumentGenerator:
         if tr_min or tr_max:
             lo = tr_min if tr_min is not None else tr_max
             hi = tr_max if tr_max is not None else tr_min
-            details.append(('Estimated Total Range', f"{self._format_currency(lo)} - {self._format_currency(hi)}"))
+            if lo == hi:
+                details.append(('Estimated Total', self._format_currency(lo)))
+            else:
+                details.append(('Estimated Total Range', f"{self._format_currency(lo)} - {self._format_currency(hi)}"))
         elif have_total:
             if max_total and max_total != min_total:
                 details.append(('Estimated Total Range', f"{self._format_currency(min_total)} - {self._format_currency(max_total)}"))
