@@ -149,7 +149,10 @@ def _research_prompt(address: str, owner_name: Optional[str],
         "=== OBJECTIVE 2: THE PROPERTY (building, unit, and site) ===\n"
         "Get everything available:\n"
         "  - beds, baths, interior living square footage, year built, number of stories/floors, "
-        "property type, lot size\n"
+        "property type, lot size. NOTE: bedroom/bathroom counts are usually NOT in assessor/tax records "
+        "— they are on LISTING pages (Zillow, Trulia, Realtor.com, Redfin, StreetEasy), shown as e.g. "
+        "'4 bd | 3 ba'. Open a current or past listing for this exact address to get the bed/bath count; "
+        "do not report beds/baths as unavailable without checking a listing.\n"
         "  - for a CONDO or CO-OP unit: the UNIT's beds/baths/interior sqft and floor from listing "
         "history, PLUS building info (year built, number of units/stories), the monthly HOA / "
         "maintenance / common charges, and whether it is a condo vs. co-op\n"
@@ -177,8 +180,9 @@ def _research_prompt(address: str, owner_name: Optional[str],
         "Use authoritative PUBLIC sources and cross-check. For NYC: StreetEasy, PropertyShark, ACRIS "
         "(a836-acris.nyc.gov), NYC ZoLa (zola.planning.nyc.gov), DOB NOW / BIS, and NYC landmark maps. "
         "For NJ: njpropertyrecords, njparcels, and the county tax assessor. For CT/other: the county or "
-        "town assessor (e.g. vgsi) and GIS. Everywhere: Zillow/Redfin/Realtor listing history, and FEMA "
-        "msc.fema.gov for flood. Prefer the county/assessor record for facts.\n\n"
+        "town assessor (e.g. vgsi) and GIS. Everywhere: Zillow/Redfin/Realtor/Trulia listing history, and "
+        "FEMA msc.fema.gov for flood. Prefer the county/assessor record for lot/sqft/year/taxes/sale, and "
+        "LISTING pages for beds/baths and floor plans (assessor records usually omit bed/bath counts).\n\n"
         "\n=== GOAL ===\n"
         "The salesperson should NOT have to research anything again before the walkthrough. Be "
         "exhaustive on building/unit details, and do your best to capture the floor plan, a photo, and "
@@ -215,13 +219,30 @@ def _gap_prompt(address: str, missing: list) -> str:
         "sqft": "interior living square footage", "year_built": "year built",
     }
     want = ", ".join(labels.get(m, m) for m in missing)
+    need_beds = any(m in ("bedrooms", "bathrooms") for m in missing)
+    beds_hint = (
+        "CRITICAL — bedrooms & bathrooms: assessor/tax records usually OMIT these; they live on LISTING "
+        "sites, which are JS-heavy so FETCHING the page often returns nothing useful. Instead run "
+        "SEPARATE web searches — '<address> Zillow', '<address> Trulia', '<address> Redfin', "
+        "'<address> Realtor', '<address> bedrooms bathrooms' — because the SEARCH-RESULT SNIPPETS "
+        "themselves display the count (e.g. '4 bd, 3.5 ba, 3,768 sqft'), even for SOLD or off-market "
+        "homes (these sites retain the full sold record). Read the count straight from the snippets. "
+        "ALSO check the county PROPERTY APPRAISER / assessor record — many jurisdictions list "
+        "'Bedrooms' and 'Bathrooms' fields directly (e.g. Miami-Dade PA at miamidadepa.gov, and most "
+        "FL/CA/TX/GA counties) and their record pages are far less JS-heavy than Zillow, so FETCH the "
+        "appraiser record page and read the counts there too. Bathrooms are the most-often-missed — "
+        "cross-check listing snippets AND the appraiser card specifically for the bath count. Report the "
+        "NUMERIC counts (e.g. bedrooms '4', bathrooms '3.5').\n"
+        if need_beds else ""
+    )
     return (
         f"Focused follow-up for the SPECIFIC property at:\n\n    {address}\n\n"
         f"Find ONLY these still-missing facts: {want}.\n"
-        "Go straight to the authoritative parcel record — the county/city assessor or tax record. For "
-        "NYC search the BBL on PropertyShark / ACRIS / NYC DOF and use StreetEasy for a unit's "
-        "beds/baths/interior sqft. Report each fact with its source. If a fact truly cannot be found, "
-        "use 'Information not available' — do not guess."
+        + beds_hint +
+        "For square footage / year built, use BOTH a listing and the county/city assessor or tax "
+        "record (for NYC search the BBL on PropertyShark / ACRIS / NYC DOF). Fetch a page if needed. "
+        "Report each fact with its source. Use 'Information not available' only if it genuinely cannot "
+        "be found — do not guess."
     )
 
 
@@ -343,7 +364,7 @@ def research_property(
         # Pass 2 (gap-fill): only for a resolvable RESIDENTIAL parcel still missing
         # core facts. Bounded (fewer searches, one fetch) so latency stays in
         # budget; merges only blanks — never overwrites a pass-1 value.
-        if address_resolves and property_kind == "residential":
+        if address_resolves and property_kind in ("residential", "unknown"):
             missing = [f for f in _CORE_FIELDS if _field(data, f) == "Information not available"]
             elapsed = time.monotonic() - _start
             if missing and elapsed > _GAPFILL_SKIP_AFTER:
@@ -353,7 +374,7 @@ def research_property(
             if missing:
                 logger.info("Gap-fill pass for '%s' (missing: %s)", address, ", ".join(missing))
                 try:
-                    gap_text = _run_search(_gap_prompt(address, missing), 4, 1)
+                    gap_text = _run_search(_gap_prompt(address, missing), 5, 2)  # room to fetch a listing page
                     gap = _structure(gap_text) if gap_text.strip() else None
                     if gap:
                         for k in _PROPERTY_FACT_KEYS:
