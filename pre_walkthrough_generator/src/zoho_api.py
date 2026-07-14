@@ -299,11 +299,36 @@ class ZohoAPI:
             logger.warning("Could not fetch CRM notes (address=%r, contact=%r): %s", address, contact_name, e)
             return out[:max_notes]
 
-    @staticmethod
-    def _norm_addr(s: str) -> str:
-        """Normalize a street address for comparison: lowercase alphanumerics only
-        ('40 Sutton Pl APT 10M' ~ '40 sutton pl apt 10m' ~ '40 Sutton Pl #10M')."""
-        return re.sub(r'[^a-z0-9]', '', str(s or '').lower())
+    _DIRS = {'e', 'w', 'n', 's', 'ne', 'nw', 'se', 'sw', 'east', 'west', 'north', 'south'}
+    _ABBR = {
+        'st': 'street', 'str': 'street', 'ave': 'avenue', 'av': 'avenue', 'pl': 'place',
+        'blvd': 'boulevard', 'rd': 'road', 'dr': 'drive', 'ct': 'court', 'ln': 'lane',
+        'pkwy': 'parkway', 'ter': 'terrace', 'hwy': 'highway', 'sq': 'square', 'plz': 'plaza',
+        'e': 'east', 'w': 'west', 'n': 'north', 's': 'south',
+        'apt': '', 'unit': '', 'ste': '', 'suite': '', 'fl': '', 'floor': '', 'no': '',
+    }
+
+    @classmethod
+    def _canon_addr(cls, s: str) -> str:
+        """Canonicalize a street line so format variants compare EQUAL — the report
+        address and the Zoho Mailing_Street often differ ('Pl' vs 'Place', 'E' vs
+        'East', 'APT 10M' vs '#10M'). Expands abbreviations/directions, drops
+        apt/unit markers, lowercases. '40 Sutton Pl APT 10M' == '40 Sutton Place, #10M'."""
+        s = re.sub(r'[^a-z0-9 ]', ' ', str(s or '').split(',')[0].lower())
+        toks = [cls._ABBR.get(t, t) for t in s.split()]
+        return ' '.join(t for t in toks if t)
+
+    @classmethod
+    def _street_search_prefix(cls, addr: str) -> str:
+        """Stable starts_with prefix for the Zoho search: street number + first
+        non-directional word (directions abbreviate as E/East, so fall back to the
+        number alone when the first word is a direction)."""
+        toks = str(addr or '').split(',')[0].split()
+        if not toks:
+            return ''
+        if len(toks) >= 2 and toks[1].lower().strip('.') not in cls._DIRS:
+            return f"{toks[0]} {toks[1]}"
+        return toks[0]
 
     # Zoho Contact field API names (verified against the live org — note Zoho's
     # own misspelling 'Propery_Status', and custom fields Budget / SQ_FT / etc).
@@ -325,20 +350,23 @@ class ZohoAPI:
         seller. Returns {} on no confident match; never raises.
         """
         try:
-            street = self._coql_safe(str(address or "").split(',')[0])
+            prefix = self._coql_safe(self._street_search_prefix(address))
             chosen = None
-            if len(street) >= 3:
-                recs = self.search_records("Contacts", f"(Mailing_Street:starts_with:{street})",
+            if len(prefix) >= 2:
+                recs = self.search_records("Contacts", f"(Mailing_Street:starts_with:{prefix})",
                                            fields=self._CONTACT_FIELDS)
-                if len(recs) == 1:
+                # Compare a CANONICAL form so 'Pl'/'Place', 'E'/'East', 'APT'/'#'
+                # variants match (the report address is abbreviation-normalized by
+                # clean_address, but Zoho stores the raw form).
+                want = self._canon_addr(address)
+                exact = [r for r in recs if self._canon_addr(r.get("Mailing_Street", "")) == want]
+                if len(exact) == 1:
+                    chosen = exact[0]
+                elif not exact and len(recs) == 1:
                     chosen = recs[0]
-                elif len(recs) > 1:
-                    # Same building, different units -> pick the exact unit match.
-                    want = self._norm_addr(str(address or "").split(',')[0])
-                    exact = [r for r in recs if self._norm_addr(r.get("Mailing_Street", "")) == want]
-                    chosen = exact[0] if len(exact) == 1 else None
-                    if not chosen:
-                        logger.info("Ambiguous contact-by-address for %r (%d candidates) — skipping", address, len(recs))
+                elif len(exact) > 1:
+                    logger.info("Ambiguous Zoho contact-by-address for %r (%d exact) — skipping",
+                                address, len(exact))
             # Fallback: exact first+last name, only if address didn't resolve.
             if not chosen and contact_name:
                 parts = self._coql_safe(contact_name).split()
