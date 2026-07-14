@@ -169,12 +169,23 @@ async def startup_sync_zoho_cache():
 async def health_check():
     """Comprehensive health check"""
     uptime = datetime.now() - server_metrics["start_time"]
+    # Non-secret integration flags (booleans only) so we can confirm which creds
+    # are actually configured on this deployment.
+    try:
+        _cfg = config.Config()
+        integrations = {
+            "zoho_configured": _cfg.has_zoho(),
+            "anthropic_configured": bool(_cfg.anthropic_api_key),
+        }
+    except Exception as e:
+        integrations = {"error": type(e).__name__}
     return {
         "status": "healthy",
         "uptime_seconds": uptime.total_seconds(),
         "requests_processed": server_metrics["requests_processed"],
         "errors": server_metrics["errors"],
         "last_request": server_metrics["last_request"],
+        "integrations": integrations,
         "timestamp": datetime.now().isoformat()
     }
 
