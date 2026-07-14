@@ -298,3 +298,77 @@ class ZohoAPI:
         except Exception as e:
             logger.warning("Could not fetch CRM notes (address=%r, contact=%r): %s", address, contact_name, e)
             return out[:max_notes]
+
+    @staticmethod
+    def _norm_addr(s: str) -> str:
+        """Normalize a street address for comparison: lowercase alphanumerics only
+        ('40 Sutton Pl APT 10M' ~ '40 sutton pl apt 10m' ~ '40 Sutton Pl #10M')."""
+        return re.sub(r'[^a-z0-9]', '', str(s or '').lower())
+
+    # Zoho Contact field API names (verified against the live org — note Zoho's
+    # own misspelling 'Propery_Status', and custom fields Budget / SQ_FT / etc).
+    _CONTACT_FIELDS = [
+        "Full_Name", "First_Name", "Last_Name", "Email", "Phone",
+        "Mailing_Street", "Mailing_City", "Mailing_State", "Mailing_Zip",
+        "Propery_Status", "Budget", "SQ_FT", "Type_of_project", "Description",
+        "Status", "Office",
+    ]
+
+    def get_contact_by_address(self, address: str = None, contact_name: str = None) -> Dict[str, Any]:
+        """Authoritative client identity + project fields from the Zoho CONTACT
+        whose Mailing address matches this property.
+
+        The property address is stored on the contact's Mailing_Street, so this
+        matches reliably by ADDRESS (unlike Deals, which are named by project
+        title). This is the source of truth for WHO the walkthrough is with —
+        e.g. an in-contract unit's contact is the incoming BUYER, not the deed
+        seller. Returns {} on no confident match; never raises.
+        """
+        try:
+            street = self._coql_safe(str(address or "").split(',')[0])
+            chosen = None
+            if len(street) >= 3:
+                recs = self.search_records("Contacts", f"(Mailing_Street:starts_with:{street})",
+                                           fields=self._CONTACT_FIELDS)
+                if len(recs) == 1:
+                    chosen = recs[0]
+                elif len(recs) > 1:
+                    # Same building, different units -> pick the exact unit match.
+                    want = self._norm_addr(str(address or "").split(',')[0])
+                    exact = [r for r in recs if self._norm_addr(r.get("Mailing_Street", "")) == want]
+                    chosen = exact[0] if len(exact) == 1 else None
+                    if not chosen:
+                        logger.info("Ambiguous contact-by-address for %r (%d candidates) — skipping", address, len(recs))
+            # Fallback: exact first+last name, only if address didn't resolve.
+            if not chosen and contact_name:
+                parts = self._coql_safe(contact_name).split()
+                if len(parts) >= 2:
+                    cs = self.search_records(
+                        "Contacts", f"((Last_Name:equals:{parts[-1]})and(First_Name:equals:{parts[0]}))",
+                        fields=self._CONTACT_FIELDS)
+                    chosen = cs[0] if len(cs) == 1 else None
+            if not chosen:
+                return {}
+
+            def g(key: str) -> str:
+                v = chosen.get(key)
+                return str(v).strip() if v not in (None, "", "null", []) else ""
+
+            result = {
+                "full_name": g("Full_Name"),
+                "email": g("Email"),
+                "phone": g("Phone"),
+                "property_status": g("Propery_Status"),  # Zoho's field spelling
+                "budget": g("Budget"),
+                "sq_ft": g("SQ_FT"),
+                "type_of_project": g("Type_of_project"),
+                "description": g("Description"),
+                "office": g("Office"),
+                "status": g("Status"),
+            }
+            logger.info("Zoho contact matched for %r: %s (status=%r)",
+                        address, result.get("full_name"), result.get("property_status"))
+            return result
+        except Exception as e:
+            logger.warning("get_contact_by_address failed for %r: %s", address, e)
+            return {}

@@ -334,12 +334,48 @@ def process_transcript_and_generate_report(transcript_path: str, address: str = 
         owner_email = (_ci.get('email') or '').strip() or None
         owner_phone = (_ci.get('phone') or '').strip() or None
 
+        # --- Zoho CONTACT record = source of truth for WHO the walkthrough is with ---
+        # The property address lives on the contact's Mailing_Street, so this matches
+        # reliably. It corrects cases where the transcript surfaced the wrong name
+        # (e.g. the SELLER of an in-contract unit) and adds authoritative
+        # status/budget/sqft. (Deal notes stay off — this is identity only.)
+        zoho_contact = {}
+        client_context = None
+        try:
+            if config_obj.has_zoho():
+                from zoho_api import ZohoAPI
+                zoho_contact = ZohoAPI(
+                    config_obj.zoho_client_id, config_obj.zoho_client_secret,
+                    config_obj.zoho_refresh_token,
+                ).get_contact_by_address(address, owner_name) or {}
+        except Exception as e:
+            logger.error("Zoho contact lookup failed: %s", e)
+        if zoho_contact.get("full_name"):
+            owner_name = zoho_contact["full_name"]          # authoritative client identity
+            owner_email = zoho_contact.get("email") or owner_email
+            owner_phone = zoho_contact.get("phone") or owner_phone
+            logger.info("Using Zoho contact as authoritative client: %r (status=%r)",
+                        owner_name, zoho_contact.get("property_status"))
+        # In-contract framing: the contact is the incoming BUYER, not the deed seller.
+        _status = (zoho_contact.get("property_status") or "").lower()
+        if "contract" in _status or "purchas" in (zoho_contact.get("description") or "").lower():
+            client_context = (
+                f"IMPORTANT: per the CRM, {owner_name or 'the client'} is the INCOMING BUYER / new owner "
+                "of this unit (it is IN CONTRACT / being purchased). Research and describe THIS person as "
+                "the buyer. The public deed/tax record will still show the CURRENT owner (the SELLER) — do "
+                "not confuse the two; if you mention the deed owner, label them the seller."
+            )
+
         logger.info("Researching property + owner via web search for '%s' (may take a few minutes)...", address)
         research = property_research.research_property(
             address, config_obj.anthropic_api_key, owner_name=owner_name,
-            owner_email=owner_email, owner_phone=owner_phone,
+            owner_email=owner_email, owner_phone=owner_phone, client_context=client_context,
         ) or {}
         property_details = research.get("property_details") or {}
+        # Backfill authoritative Zoho facts the web research may have missed.
+        if isinstance(property_details, dict) and zoho_contact:
+            if zoho_contact.get("sq_ft") and str(property_details.get("sqft") or "").strip() in ("", "Information not available"):
+                property_details["sqft"] = f"{zoho_contact['sq_ft']} sq ft (per CRM)"
         if not property_details:
             logger.warning("Property research returned nothing for '%s' — limited property info", address)
         else:
@@ -395,6 +431,7 @@ def process_transcript_and_generate_report(transcript_path: str, address: str = 
             "owner_summary": research.get("owner_summary"),
             "research_address_resolves": research.get("address_resolves", True),
             "research_property_kind": research.get("property_kind"),
+            "zoho_contact": zoho_contact,
             "zoho_notes": zoho_notes,
         }
 

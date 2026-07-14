@@ -603,7 +603,35 @@ class DocumentGenerator:
         transcript_info = data.get('transcript_info', {}) or {}
         client_info = transcript_info.get('client_info', {}) or {}
 
-        # Research-derived client background, surfaced FIRST (formerly its own
+        # Zoho CRM contact = the AUTHORITATIVE record of who reached out (and their
+        # current status). Shown first, above web-research inferences, because it
+        # is ground truth — e.g. an in-contract unit's contact is the incoming
+        # BUYER, not the deed owner the public records show.
+        zc = data.get('zoho_contact') or {}
+        if zc.get('full_name'):
+            def _money(v):
+                try:
+                    return f"${float(str(v).replace(',', '').replace('$', '').strip()):,.0f}"
+                except Exception:
+                    return str(v)
+            zp = self.doc.add_paragraph()
+            zp.add_run('From Zoho CRM (authoritative):').bold = True
+            bits = [f"Client: {zc['full_name']}"]
+            if zc.get('property_status'):
+                bits.append(f"Property status: {zc['property_status']}")
+            if zc.get('type_of_project'):
+                bits.append(f"Project type: {zc['type_of_project']}")
+            if zc.get('budget'):
+                bits.append(f"Budget: {_money(zc['budget'])}")
+            if zc.get('sq_ft'):
+                bits.append(f"Size: {zc['sq_ft']} sq ft")
+            _contact = ' · '.join(b for b in (zc.get('email'), zc.get('phone')) if b)
+            if _contact:
+                bits.append(f"Contact: {_contact}")
+            for b in bits:
+                self.doc.add_paragraph(f"• {b}")
+
+        # Research-derived client background, surfaced next (formerly its own
         # "Owner Profile" section — consolidated here).
         summary = data.get('owner_summary')
         if summary and str(summary).strip() not in ('', 'Information not available'):
@@ -618,7 +646,9 @@ class DocumentGenerator:
         table.autofit = True
 
         names = self._lines(client_info.get('names'))
-        names_str = ', '.join(names) if names else 'N/A'
+        # Prefer the authoritative Zoho contact identity over the transcript
+        # (which can surface the wrong person, e.g. the seller).
+        names_str = zc.get('full_name') or (', '.join(names) if names else 'N/A')
 
         # Preferences (guard against non-dict)
         preferences = client_info.get('preferences', {})
@@ -643,8 +673,8 @@ class DocumentGenerator:
 
         details = [
             ('Name', names_str),
-            ('Phone', client_info.get('phone') or 'N/A'),
-            ('Email', client_info.get('email') or 'N/A'),
+            ('Phone', zc.get('phone') or client_info.get('phone') or 'N/A'),
+            ('Email', zc.get('email') or client_info.get('email') or 'N/A'),
             ('Preferences', preferences_str),
             ('Constraints', constraints_str),
             ('Potential Concerns', red_flags_str)

@@ -77,7 +77,8 @@ _RESEARCH_SCHEMA = {
 
 
 def _research_prompt(address: str, owner_name: Optional[str],
-                     owner_email: Optional[str] = None, owner_phone: Optional[str] = None) -> str:
+                     owner_email: Optional[str] = None, owner_phone: Optional[str] = None,
+                     client_context: Optional[str] = None) -> str:
     person = owner_name.strip() if owner_name else None
     # Client-provided contact details (from the consultation) — used ONLY to
     # confirm WHICH public professional profile is the right person when the name
@@ -111,6 +112,7 @@ def _research_prompt(address: str, owner_name: Optional[str],
         "salesperson, who will meet the client at the property. Be THOROUGH and specific — this brief "
         "should let the rep walk in fully informed. Research:\n\n"
         f"    {address}\n\n"
+        + (f"{client_context}\n\n" if client_context else "") +
         "=== FIRST: CLASSIFY THE ADDRESS ===\n"
         "Decide what this address actually is and set two fields accordingly:\n"
         "  - a specific home / condo / co-op unit -> address_resolves=true, property_kind='residential'\n"
@@ -256,6 +258,7 @@ def research_property(
     owner_name: Optional[str] = None,
     owner_email: Optional[str] = None,
     owner_phone: Optional[str] = None,
+    client_context: Optional[str] = None,
     model: str = DEFAULT_MODEL,
     effort: str = "low",
     max_searches: int = 8,
@@ -353,7 +356,7 @@ def research_property(
                 return False
 
         # Pass 1: full research + structuring.
-        research_text = _run_search(_research_prompt(address, owner_name, owner_email, owner_phone),
+        research_text = _run_search(_research_prompt(address, owner_name, owner_email, owner_phone, client_context),
                                     max_searches, max_fetches)
         if not research_text.strip():
             logger.info("Property research produced no text for '%s'", address)
