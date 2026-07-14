@@ -174,7 +174,7 @@ async def health_check():
     try:
         _cfg = config.Config()
         integrations = {
-            "zoho_configured": _cfg.has_zoho(),
+            "zoho_configured": _cfg.has_zoho,
             "anthropic_configured": bool(_cfg.anthropic_api_key),
         }
     except Exception as e:
@@ -353,7 +353,7 @@ def process_transcript_and_generate_report(transcript_path: str, address: str = 
         zoho_contact = {}
         client_context = None
         try:
-            if config_obj.has_zoho():
+            if config_obj.has_zoho:  # property, not a method
                 from zoho_api import ZohoAPI
                 zoho_contact = ZohoAPI(
                     config_obj.zoho_client_id, config_obj.zoho_client_secret,
