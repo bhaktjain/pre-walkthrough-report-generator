@@ -193,6 +193,10 @@ def _research_prompt(address: str, owner_name: Optional[str],
         "The salesperson should NOT have to research anything again before the walkthrough. Be "
         "exhaustive on building/unit details, and do your best to capture the floor plan, a photo, and "
         "the listing URL if they exist publicly.\n\n"
+        "TONE: this goes into a polished, professional report. Write owner_summary and feasibility_notes "
+        "in normal sentence case — do NOT use ALL-CAPS words for emphasis (write 'Not confirmed — verify "
+        "in person', never 'NOT CONFIRMED'). Keep genuine acronyms as-is (LLC, ACRIS, FEMA, DOB, HOA, "
+        "UBS). Keep each note concise and factual.\n\n"
         "Be factual and cite your sources. If a specific fact cannot be found, use the exact phrase "
         "'Information not available' for it rather than guessing."
     )

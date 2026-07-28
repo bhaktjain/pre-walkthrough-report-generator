@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 from datetime import datetime
 import logging
+import re
 import requests
 from io import BytesIO
 from PIL import Image
@@ -614,11 +615,14 @@ class DocumentGenerator:
                     return f"${float(str(v).replace(',', '').replace('$', '').strip()):,.0f}"
                 except Exception:
                     return str(v)
+            def _tidy(v):
+                v = re.sub(r'\s*/\s*', ' / ', re.sub(r'\s+', ' ', str(v).strip()))
+                return re.sub(r'(\w)-\s+(\w)', r'\1 - \2', v)  # "Owner- Not" -> "Owner - Not"
             zp = self.doc.add_paragraph()
-            zp.add_run('From Zoho CRM (authoritative):').bold = True
+            zp.add_run('From Zoho CRM:').bold = True
             bits = [f"Client: {zc['full_name']}"]
             if zc.get('property_status'):
-                bits.append(f"Property status: {zc['property_status']}")
+                bits.append(f"Property status: {_tidy(zc['property_status'])}")
             if zc.get('type_of_project'):
                 bits.append(f"Project type: {zc['type_of_project']}")
             if zc.get('budget'):
