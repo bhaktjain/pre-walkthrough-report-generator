@@ -365,7 +365,7 @@ class DocumentGenerator:
         if additional.get('structural_changes'):
             drivers.append('layout upgrade')
         if additional.get('systems_updates'):
-            drivers.append('systems modernisation')
+            drivers.append('systems modernization')
         client_drivers = ', '.join(drivers) if drivers else None
 
         # 3. Key numbers — budget + timeline
@@ -431,7 +431,9 @@ class DocumentGenerator:
             f"3. Key Numbers – {key_numbers}.",
         ]
         for text in bullets:
-            para = self.doc.add_paragraph(text, style='List Bullet')
+            # Plain paragraph (not 'List Bullet') — the text already carries its
+            # own "1./2./3." numbering, so a bullet glyph would double it up.
+            para = self.doc.add_paragraph(text)
             para.paragraph_format.space_after = Pt(6)
 
     def _add_property_details(self, data: Dict[str, Any]):
@@ -679,13 +681,20 @@ class DocumentGenerator:
                     flag_items.append(key.replace('_', ' ').title())
         red_flags_str = '\n'.join(flag_items) if flag_items else 'None'
 
-        details = [
-            ('Name', names_str),
-            ('Phone', zc.get('phone') or client_info.get('phone') or 'N/A'),
-            ('Email', zc.get('email') or client_info.get('email') or 'N/A'),
+        details = []
+        # Identity/contact live in the "From Zoho CRM" block above when present —
+        # only repeat them in the table when there's no Zoho block (avoid showing
+        # name/phone/email twice in one section).
+        if not zc.get('full_name'):
+            details += [
+                ('Name', names_str),
+                ('Phone', client_info.get('phone') or 'N/A'),
+                ('Email', client_info.get('email') or 'N/A'),
+            ]
+        details += [
             ('Preferences', preferences_str),
             ('Constraints', constraints_str),
-            ('Potential Concerns', red_flags_str)
+            ('Potential Concerns', red_flags_str),
         ]
         # If the client stated a profession on the call, keep it (first-hand);
         # otherwise the research-derived Background block above already covers it.
@@ -694,7 +703,10 @@ class DocumentGenerator:
         # like "Unknown - travels for work" (the researched Background covers it).
         if _stated_prof and _stated_prof.lower() not in ('n/a', 'none', 'information not available') \
                 and not _stated_prof.lower().startswith(('unknown', 'unclear', 'not ')):
-            details.insert(3, ('Profession (stated)', _stated_prof))
+            # Insert just before 'Preferences' regardless of whether the identity
+            # rows are present.
+            _pos = next((i for i, (k, _) in enumerate(details) if k == 'Preferences'), 0)
+            details.insert(_pos, ('Profession (stated)', _stated_prof))
 
         for item, detail in details:
             row_cells = table.add_row().cells
@@ -774,7 +786,7 @@ class DocumentGenerator:
         if not realtor_url and zillow_url:
             zpara = self.doc.add_paragraph()
             zpara.add_run('• Zillow: ').bold = True
-            self._add_hyperlink(zpara, 'View Listing', zillow_url)
+            self._add_hyperlink(zpara, 'Search on Zillow', zillow_url)
 
         # Floor Plan — try hardest to hand the rep an actual plan so they never
         # have to hunt for it: (1) a floor-plan image the research found, embedded;
@@ -832,7 +844,9 @@ class DocumentGenerator:
                 if url:
                     fp = self.doc.add_paragraph()
                     fp.add_run(f'• {name}: ').bold = True
-                    self._add_hyperlink(fp, 'Open listing', url)
+                    # These are SEARCH links, not confirmed listings — label them
+                    # honestly so they don't contradict "Not found on Realtor.com".
+                    self._add_hyperlink(fp, f'Search on {name}', url)
 
     def _add_section_break(self):
         """Add a section break for clarity"""
@@ -917,8 +931,13 @@ class DocumentGenerator:
                 continue  # handled in dedicated timeline section
             if not isinstance(section, dict) or not self._is_meaningful(section):
                 continue
+            # Cost fields live in the dedicated Budget Summary — don't repeat them
+            # here (avoids duplicating the kitchen range / "additional fees" note).
+            _cost_keys = {'estimated_cost', 'estimated_costs', 'cost_per_bathroom', 'cost', 'budget'}
             rows = []
             for key, value in section.items():
+                if key.lower() in _cost_keys:
+                    continue
                 if not self._is_meaningful(value):
                     continue
                 pretty = self._stringify(value)
@@ -1097,9 +1116,13 @@ class DocumentGenerator:
             lo = tr_min if tr_min is not None else tr_max
             hi = tr_max if tr_max is not None else tr_min
             if lo == hi:
-                details.append(('Estimated Total', self._format_currency(lo)))
+                _tlabel, _tval = 'Estimated Total', self._format_currency(lo)
             else:
-                details.append(('Estimated Total Range', f"{self._format_currency(lo)} - {self._format_currency(hi)}"))
+                _tlabel, _tval = 'Estimated Total Range', f"{self._format_currency(lo)} - {self._format_currency(hi)}"
+            # Skip when the total merely repeats a single component already shown
+            # (e.g. a kitchen-only budget where Kitchen Total == the total).
+            if _tval not in {v for _, v in details}:
+                details.append((_tlabel, _tval))
         elif have_total:
             if max_total and max_total != min_total:
                 details.append(('Estimated Total Range', f"{self._format_currency(min_total)} - {self._format_currency(max_total)}"))
