@@ -681,9 +681,12 @@ class DocumentGenerator:
         ]
         # If the client stated a profession on the call, keep it (first-hand);
         # otherwise the research-derived Background block above already covers it.
-        _stated_prof = client_info.get('profession')
-        if _stated_prof and str(_stated_prof).strip().lower() not in ('', 'n/a', 'none', 'information not available'):
-            details.insert(3, ('Profession (stated)', str(_stated_prof).strip()))
+        _stated_prof = str(client_info.get('profession') or '').strip()
+        # Only show a stated profession that's a real answer — skip non-answers
+        # like "Unknown - travels for work" (the researched Background covers it).
+        if _stated_prof and _stated_prof.lower() not in ('n/a', 'none', 'information not available') \
+                and not _stated_prof.lower().startswith(('unknown', 'unclear', 'not ')):
+            details.insert(3, ('Profession (stated)', _stated_prof))
 
         for item, detail in details:
             row_cells = table.add_row().cells
@@ -1072,9 +1075,11 @@ class DocumentGenerator:
                     max_total += c
                     have_total = True
 
-        # Additional fees (descriptive, not summed)
-        for fee in self._lines(estimated_costs.get('additional_fees')):
-            details.append(('Additional Fee', fee))
+        # Additional fees (descriptive, not summed) — consolidated into ONE row so
+        # the "Additional Fee" label isn't repeated for every line.
+        add_fees = self._lines(estimated_costs.get('additional_fees'))
+        if add_fees:
+            details.append(('Cost Notes', '\n'.join(f"• {f}" for f in add_fees) if len(add_fees) > 1 else add_fees[0]))
 
         # Authoritative total range from extraction, if present; else derive from components.
         tr = estimated_costs.get('total_estimated_range') or {}
@@ -1131,37 +1136,6 @@ class DocumentGenerator:
             cells = table.add_row().cells
             cells[0].text = label
             cells[1].text = pretty
-
-    def _add_notes(self, data: Dict[str, Any]):
-        """Add notes section"""
-        self._heading('Notes:', level=1)
-
-        transcript_info = data.get('transcript_info', {}) or {}
-        renovation = transcript_info.get('renovation_scope', {}) or {}
-        materials = transcript_info.get('materials_and_design', {}) or {}
-        project_mgmt = transcript_info.get('project_management', {}) or {}
-
-        notes = []
-
-        if materials.get('sourcing_responsibility'):
-            notes.append(f"• {materials['sourcing_responsibility']}")
-
-        kitchen_reno = renovation.get('kitchen') or {}
-        notes.extend(f"• {req}" for req in self._lines(kitchen_reno.get('specific_requirements')))
-        bathrooms_reno = renovation.get('bathrooms') or {}
-        notes.extend(f"• {req}" for req in self._lines(bathrooms_reno.get('specific_requirements')))
-
-        if project_mgmt.get('communication_preferences'):
-            notes.append(f"• Communication preference: {project_mgmt['communication_preferences']}")
-        notes.extend(f"• {doc}" for doc in self._lines(project_mgmt.get('documentation_needs')))
-
-        notes = [self._scrub_company(n) for n in notes]
-        notes = [n for n in notes if n.strip() and n.lower().strip('• ') not in {'unknown', 'n/a', 'none'}]
-        if not notes:
-            notes = ['• No special notes recorded.']
-
-        for note in notes:
-            self.doc.add_paragraph(note)
 
     def _add_neighboring_projects(self, data: Dict[str, Any]):
         """Add neighboring projects section from Zoho CRM"""
@@ -1309,7 +1283,8 @@ class DocumentGenerator:
                 ('Project Management', self._add_project_management),
                 ('Neighboring Projects', self._add_neighboring_projects),
                 ('CRM Notes', self._add_crm_notes),
-                ('Notes', self._add_notes),
+                # 'Notes' section removed — it duplicated the Kitchen/Bathroom scope,
+                # Materials sourcing, and Project Management comms/docs verbatim.
             ]
 
             for name, render in sections:
