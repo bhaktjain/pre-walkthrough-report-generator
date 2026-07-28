@@ -628,7 +628,11 @@ class DocumentGenerator:
             if zc.get('budget'):
                 bits.append(f"Budget: {_money(zc['budget'])}")
             if zc.get('sq_ft'):
-                bits.append(f"Size: {zc['sq_ft']} sq ft")
+                try:
+                    _sqft = f"{int(float(str(zc['sq_ft']).replace(',', ''))):,}"
+                except Exception:
+                    _sqft = str(zc['sq_ft'])
+                bits.append(f"Size: {_sqft} sq ft")
             _contact = ' · '.join(b for b in (zc.get('email'), zc.get('phone')) if b)
             if _contact:
                 bits.append(f"Contact: {_contact}")
