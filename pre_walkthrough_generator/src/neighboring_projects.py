@@ -69,14 +69,6 @@ class NeighboringProjectsManager:
         addr = ' '.join(addr.split())
         return addr
 
-    @staticmethod
-    def _unit_of(address: str) -> str:
-        """Extract the unit/apt token (e.g. '10M', '5G', '2101') for subject-unit
-        exclusion. '' if none. Handles 'Apt 10M', '#10M', 'Unit 2101'."""
-        m = re.search(r'(?:apt\.?|apartment|unit|ste|suite|#)\s*#?\s*([a-z0-9\-]+)',
-                      str(address or ''), re.IGNORECASE)
-        return m.group(1).lower() if m else ''
-
     def _is_same_building(self, address1: str, address2: str) -> bool:
         """Check if two addresses are in the same building"""
         norm1 = self._normalize_address(address1)
@@ -227,7 +219,6 @@ class NeighboringProjectsManager:
             target_hood_lower = None
             logger.warning(f"Could not determine neighborhood for: {target_address}")
 
-        target_unit = self._unit_of(target_address)
         neighboring = []
         for deal in deals:
             deal_name = deal.get("Deal_Name", "")
@@ -237,13 +228,11 @@ class NeighboringProjectsManager:
             deal_address = deal_name
             deal_neighborhood = deal.get("Neighborhood")
 
-            # Check same building
+            # Check same building. NOTE: we intentionally KEEP a deal on the subject
+            # unit itself — an existing/prior CRM deal on this exact unit is useful
+            # context for the rep (e.g. a prior quote or the current deal), per
+            # request, not noise to hide.
             is_same_bldg = self._is_same_building(target_address, deal_address)
-
-            # Never list the SUBJECT unit's own deal as a "neighbor" — same
-            # building AND same unit number means it's this very property.
-            if is_same_bldg and target_unit and self._unit_of(deal_address) == target_unit:
-                continue
 
             # Check same neighborhood
             is_same_hood = False
